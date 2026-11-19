@@ -1,0 +1,2404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Room Allocation System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Firebase SDK (compat mode for Firestore-style API) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lato:wght@400;700&family=Noto+Sans:wght@400;500;600;700&family=Open+Sans:wght@400;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f3f0ed;--surface:#fff;--border:#ddd5cc;
+  --text:#1a1612;--text-muted:#6b5e52;--text-light:#9a8e82;
+  --primary:#cd0947;--primary-light:#fce4ec;--primary-hover:#a5063a;--primary-dark:#8c0432;
+  --accent:#1b2a4a;--accent-light:#e8ecf3;
+  --success:#2e7d32;--success-light:#e8f5e9;--success-bg:#f1f8f1;
+  --warning:#e6a200;--warning-light:#fff8e1;--warning-bg:#fffcf0;
+  --danger:#c62828;--danger-light:#ffebee;--danger-bg:#fff5f5;
+  --male:#1565c0;--male-light:#e3f2fd;
+  --female:#ad1457;--female-light:#fce4ec;
+  --couple:#6a1b9a;--couple-light:#f3e5f5;
+  --hospital:#00695c;--hospital-light:#e0f2f1;
+  --shadow:0 1px 3px rgba(0,0,0,.07);--shadow-lg:0 4px 16px rgba(0,0,0,.1);--radius:8px;
+  --font:'Segoe UI',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --fs:15px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.5;font-size:var(--fs)}
+body.fullscreen-mode .header,body.fullscreen-mode .booking-section{display:none}
+body.fullscreen-mode .tab-bar{position:sticky;top:0;z-index:100}
+
+/* Header */
+.header{background:linear-gradient(135deg,var(--accent) 0%,#2d1a3e 100%);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.header h1{font-size:17px;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
+.header h1 .wlf-badge{background:var(--primary);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:800;letter-spacing:.5px}
+.header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sync-badge{font-size:10px;padding:3px 9px;border-radius:12px;font-weight:600;background:rgba(255,255,255,.15);color:rgba(255,255,255,.9)}
+.header-stats{display:flex;gap:4px;flex-wrap:wrap}
+.stat-badge{background:rgba(255,255,255,.12);padding:3px 9px;border-radius:14px;font-size:10px;font-weight:600;color:rgba(255,255,255,.9)}
+
+/* Booking form */
+.booking-section{background:var(--surface);border-bottom:2px solid var(--primary);padding:16px 20px;box-shadow:var(--shadow)}
+.booking-title{font-size:14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;color:var(--accent)}
+.admin-toggle{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--text-muted)}
+.admin-toggle input{accent-color:var(--primary)}
+.bf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;align-items:start}
+.form-group{display:flex;flex-direction:column;gap:2px}
+.form-group label{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px}
+.form-group input,.form-group select{padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--surface);transition:all .15s;font-family:var(--font)}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.radio-row{display:flex;gap:3px}
+.radio-pill{flex:1}
+.radio-pill input{display:none}
+.radio-pill label{display:block;text-align:center;padding:6px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
+.radio-pill input:checked+label{background:var(--primary);color:#fff;border-color:var(--primary)}
+.couple-row{display:none}.couple-row.show{display:flex;flex-direction:column;gap:2px}
+.upload-group{display:flex;flex-direction:column;gap:2px}
+.upload-group label{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px}
+.upload-btn{padding:6px 9px;border:1px dashed var(--border);border-radius:6px;font-size:11px;cursor:pointer;text-align:center;color:var(--text-muted);transition:all .15s;background:var(--bg)}
+.upload-btn:hover{border-color:var(--primary);color:var(--primary)}
+.upload-btn.has-file{border-color:var(--success);color:var(--success);border-style:solid}
+.btn{padding:7px 14px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;font-family:var(--font)}
+.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-hover)}
+.btn-sm{padding:3px 9px;font-size:11px}
+.btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{background:#9e1b1b}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}.btn-outline:hover{background:var(--bg)}
+.btn-success{background:var(--success);color:#fff}.btn-success:hover{background:#1b5e20}
+.btn-accent{background:var(--accent);color:#fff}.btn-accent:hover{background:#0f1d38}
+.msg-bar{margin-top:6px;font-size:12px;min-height:16px}.msg-bar .error{color:var(--danger)}.msg-bar .success{color:var(--success)}
+
+/* Tabs */
+.tab-bar{background:var(--accent);padding:0 20px;display:flex;align-items:center;gap:0;overflow-x:auto}
+.tab{padding:10px 14px;font-size:12px;font-weight:600;color:rgba(255,255,255,.6);cursor:pointer;border-bottom:2.5px solid transparent;transition:all .15s;white-space:nowrap}
+.tab:hover{color:#fff}.tab.active{color:#fff;border-bottom-color:var(--primary)}
+.tab-actions{margin-left:auto;display:flex;gap:5px;align-items:center;padding:5px 0;flex-shrink:0}
+.tab-actions .btn{font-size:10px;padding:4px 10px}
+
+.view{display:none}.view.active{display:block}
+.loading-overlay{display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text-muted)}
+.loading-overlay.hidden{display:none}
+.spinner{width:20px;height:20px;border:2.5px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .6s linear infinite;margin-right:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.controls{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.controls label{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px}
+.controls input[type="date"],.controls select{padding:4px 7px;border:1px solid var(--border);border-radius:5px;font-size:11px;background:var(--surface);font-family:var(--font)}
+.spacer{flex:1}
+.legend{display:flex;gap:10px;flex-wrap:wrap;padding:6px 20px;background:var(--bg);border-bottom:1px solid var(--border)}
+.legend-item{display:flex;align-items:center;gap:3px;font-size:10px;color:var(--text-muted);font-weight:500}
+.legend-dot{width:8px;height:8px;border-radius:50%}
+
+/* Room grid */
+.rooms-wrap{padding:14px 20px}
+.room-section{margin-bottom:16px}
+.room-section h3{font-size:10px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.room-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:7px}
+.room-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:9px;box-shadow:var(--shadow);transition:all .15s}
+.room-card:hover{box-shadow:var(--shadow-lg);border-color:var(--primary)}
+.room-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.room-name{font-weight:700;font-size:12px;color:var(--accent)}
+.room-type-badge{font-size:8px;padding:2px 6px;border-radius:6px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.badge-standard{background:var(--accent-light);color:var(--accent)}
+.badge-deluxe{background:var(--couple-light);color:var(--couple)}
+.badge-hostel-f{background:var(--female-light);color:var(--female)}
+.badge-hostel-m{background:var(--male-light);color:var(--male)}
+.badge-hospital-f{background:var(--hospital-light);color:var(--hospital)}
+.badge-hospital-m{background:var(--hospital-light);color:var(--hospital)}
+.occupancy-bar{height:3px;background:var(--bg);border-radius:2px;margin-bottom:5px;overflow:hidden}
+.occupancy-fill{height:100%;border-radius:2px;transition:width .3s}
+.occupancy-fill.empty{width:0%}.occupancy-fill.partial{background:var(--warning)}.occupancy-fill.full{background:var(--primary);width:100%}
+.bedroom{background:var(--bg);border-radius:6px;padding:5px 7px;margin-bottom:3px}.bedroom:last-child{margin-bottom:0}
+.bedroom-label{font-size:9px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px}
+.guest-tags{display:flex;flex-wrap:wrap;gap:3px}
+.guest-tag{font-size:10px;padding:2px 6px;border-radius:6px;font-weight:500;display:flex;align-items:center;gap:2px;cursor:pointer}
+.guest-tag.male{background:var(--male-light);color:var(--male)}
+.guest-tag.female{background:var(--female-light);color:var(--female)}
+.guest-tag.couple{background:var(--couple-light);color:var(--couple)}
+.guest-tag .rx{cursor:pointer;font-size:12px;line-height:1;opacity:.5;margin-left:1px}.guest-tag .rx:hover{opacity:1}
+.empty-slot{font-size:10px;color:var(--text-light);font-style:italic}
+
+/* Bookings list */
+.bookings-panel{padding:0 20px 14px}
+.booking-list-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.booking-item{padding:8px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11px;gap:8px}
+.booking-item:last-child{border-bottom:none}
+.booking-name{font-weight:600;font-size:12px;color:var(--accent)}.booking-detail{color:var(--text-muted);font-size:10px}
+.booking-id-info{font-size:10px;color:var(--text-light)}
+.no-bookings{padding:20px;text-align:center;color:var(--text-light);font-size:12px}
+
+/* Calendar */
+.calendar-wrapper{padding:14px 20px}
+.month-nav{display:flex;align-items:center;gap:5px}
+.month-nav button{width:28px;height:28px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;color:var(--accent)}
+.month-nav button:hover{background:var(--bg)}
+.month-label{font-weight:700;font-size:14px;min-width:140px;text-align:center;color:var(--accent)}
+/* Dashboard */
+.dash{padding:16px 20px;display:flex;flex-direction:column;gap:16px}
+.dash-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;text-align:center;box-shadow:var(--shadow)}
+.kpi-val{font-size:28px;font-weight:800;color:var(--accent);line-height:1.1}
+.kpi-label{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.kpi.highlight .kpi-val{color:var(--primary)}
+.kpi.green .kpi-val{color:var(--success)}
+.kpi.warn .kpi-val{color:var(--warning)}
+.dash-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.dash-row{grid-template-columns:1fr}}
+.dash-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+.dash-card h3{font-size:12px;font-weight:700;color:var(--accent);margin:0 0 10px;text-transform:uppercase;letter-spacing:.4px}
+.dash-card-full{grid-column:1/-1}
+.dash-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11px}
+.dash-bar-label{min-width:110px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dash-bar-track{flex:1;height:16px;background:var(--bg);border-radius:8px;overflow:hidden;position:relative}
+.dash-bar-fill{height:100%;border-radius:8px;transition:width .3s;min-width:2px}
+.dash-bar-pct{min-width:36px;text-align:right;font-weight:700;font-size:10px;color:var(--text-muted)}
+.dash-list{max-height:200px;overflow-y:auto}
+.dash-list-item{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px}
+.dash-list-item:last-child{border-bottom:none}
+.dash-mini-chart{display:flex;align-items:flex-end;gap:2px;height:80px;padding:4px 0}
+.dash-mini-bar{flex:1;border-radius:3px 3px 0 0;min-width:4px;position:relative;cursor:default;transition:height .3s}
+.dash-mini-bar:hover::after{content:attr(data-tip);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:9px;padding:2px 6px;border-radius:4px;white-space:nowrap;z-index:5}
+.dash-donut-wrap{display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap}
+.dash-donut-legend{font-size:11px;display:flex;flex-direction:column;gap:4px}
+.dash-donut-legend span{display:flex;align-items:center;gap:5px}
+.dash-donut-legend .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.dash-alert{padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;margin-bottom:4px}
+.dash-alert.red{background:var(--danger-bg);color:var(--danger)}
+.dash-alert.amber{background:var(--warning-bg);color:#8a6d00}
+.cal-view-toggle{display:flex;gap:2px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:2px}
+.cal-view-btn{padding:4px 12px;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:var(--text-muted);transition:all .15s}
+.cal-view-btn.active{background:var(--primary);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.cal-view-btn:hover:not(.active){background:var(--border);color:var(--accent)}
+.cal-date-slider{display:flex;align-items:center;gap:6px;padding:4px 20px 2px}
+.cal-date-slider input[type=range]{flex:1;height:6px;-webkit-appearance:none;appearance:none;background:var(--border);border-radius:3px;outline:none;cursor:pointer}
+.cal-date-slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--primary);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.cal-date-slider input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--primary);cursor:pointer;border:none}
+.cal-date-slider .slider-label{font-size:10px;font-weight:600;color:var(--text-muted);min-width:70px;white-space:nowrap}
+.cal-today-btn{padding:3px 10px;border:1px solid var(--primary);border-radius:6px;background:transparent;color:var(--primary);font-size:10px;font-weight:600;cursor:pointer}
+.cal-today-btn:hover{background:var(--primary);color:#fff}
+.calendar-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow)}
+.calendar-table{border-collapse:collapse;table-layout:fixed}
+.calendar-table th,.calendar-table td{border:1px solid var(--border);text-align:center;font-size:10px;overflow:hidden;word-wrap:break-word}
+.calendar-table thead th{background:var(--accent);color:#fff;padding:4px 2px;font-weight:600;position:sticky;top:0;z-index:2}
+.calendar-table thead th.weekend{background:var(--primary-dark);color:#fff}
+.calendar-table .room-label{text-align:left;padding:4px 7px;font-weight:600;font-size:10px;background:var(--surface);position:sticky;left:0;z-index:1;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal-resizable{position:relative}
+.cal-resize-handle{position:absolute;right:0;top:0;bottom:0;width:6px;cursor:col-resize;z-index:6}
+.cal-resize-handle:hover{background:rgba(255,255,255,.45)}
+body.cal-resizing,body.cal-resizing *{cursor:col-resize !important;user-select:none !important;-webkit-user-select:none !important}
+.calendar-table .section-row td{background:var(--accent-light);font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--primary);padding:4px 7px;text-align:left}
+.cal-cell{padding:2px;cursor:pointer;transition:all .1s;word-wrap:break-word;overflow-wrap:break-word;white-space:normal}
+.cal-cell:hover{outline:2px solid var(--primary);outline-offset:-2px;z-index:3}
+.cal-cell.empty{background:var(--success-bg)}.cal-cell.partial{background:var(--warning-bg)}.cal-cell.full{background:var(--danger-bg)}
+.cal-cell .cc{font-size:9px;font-weight:600}
+.cal-cell.empty .cc{color:var(--success)}.cal-cell.partial .cc{color:var(--warning)}.cal-cell.full .cc{color:var(--danger)}
+.cal-cell.today{box-shadow:inset 0 0 0 2px var(--primary)}
+.tooltip{display:none;position:fixed;background:var(--accent);color:#fff;padding:8px 11px;border-radius:8px;font-size:10px;z-index:100;max-width:220px;box-shadow:0 8px 24px rgba(0,0,0,.25);pointer-events:none}
+.tooltip.show{display:block}
+.tooltip-title{font-weight:700;margin-bottom:2px;font-size:11px}
+.tooltip-guest{padding:1px 0;display:flex;align-items:center;gap:3px}
+.tooltip-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+/* Room management */
+.manage-wrap{padding:16px 20px}
+.manage-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:800px){.manage-grid{grid-template-columns:1fr}}
+.manage-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.manage-card-header{padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:13px;color:var(--accent);background:var(--accent-light);display:flex;justify-content:space-between;align-items:center}
+.manage-card-body{padding:14px}
+.manage-form .form-group{margin-bottom:8px}
+.room-type-list{max-height:400px;overflow-y:auto}
+.rt-item{padding:8px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.rt-item:last-child{border-bottom:none}
+.rt-info{font-size:12px}.rt-name{font-weight:600;color:var(--accent)}.rt-detail{font-size:10px;color:var(--text-muted)}
+.rt-count{font-size:18px;font-weight:700;color:var(--primary);min-width:36px;text-align:center}
+
+/* Guest detail modal */
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(27,42,74,.5);z-index:200;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--surface);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.2);max-width:480px;width:90%;max-height:85vh;overflow-y:auto;padding:0}
+.modal-header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:var(--accent);color:#fff;border-radius:12px 12px 0 0}
+.modal-header h3{font-size:15px;font-weight:700}
+.modal-close{width:26px;height:26px;border:none;background:rgba(255,255,255,.15);border-radius:50%;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;color:#fff}
+.modal-close:hover{background:rgba(255,255,255,.3)}
+.modal-body-inner{padding:14px 18px}
+.detail-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bg);font-size:12px}
+.detail-label{font-weight:600;color:var(--text-muted)}.detail-value{text-align:right;color:var(--accent)}
+.doc-preview{margin-top:10px;text-align:center}
+.doc-preview img{max-width:100%;max-height:300px;border-radius:8px;border:1px solid var(--border)}
+.doc-preview-label{font-size:10px;color:var(--text-muted);margin-bottom:4px;font-weight:600;text-transform:uppercase}
+
+/* Manual assign */
+.manual-section{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px}
+.manual-title{font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;color:var(--accent);user-select:none}
+.manual-title .arrow{transition:transform .2s;font-size:10px}
+.manual-title .arrow.open{transform:rotate(90deg)}
+.manual-body{display:none;padding-top:10px}.manual-body.show{display:block}
+.manual-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;align-items:end}
+
+/* Delete rooms section */
+.delete-rooms-section{margin-top:14px}
+.del-room-item{padding:6px 10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11px}
+.del-room-item:last-child{border-bottom:none}
+.del-room-item:hover{background:var(--danger-light)}
+.del-room-name{font-weight:600;color:var(--accent);font-size:12px}
+.del-room-detail{font-size:10px;color:var(--text-muted)}
+.del-room-actions{display:flex;gap:4px;align-items:center}
+.log-item{padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;display:flex;gap:10px;align-items:flex-start}
+.log-item:hover{background:rgba(0,0,0,.02)}
+.log-time{color:var(--text-muted);white-space:nowrap;min-width:130px;font-size:10px}
+.log-action{font-weight:600;min-width:55px;font-size:10px;padding:2px 6px;border-radius:4px;text-align:center;text-transform:uppercase}
+.log-action.add{background:#d4edda;color:#155724}.log-action.edit{background:#fff3cd;color:#856404}.log-action.delete{background:#f8d7da;color:#721c24}.log-action.rename{background:#d1ecf1;color:#0c5460}.log-action.override{background:#e2d5f1;color:#4a2578}
+.log-detail{flex:1;line-height:1.4}
+.backup-item{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12px}
+.backup-item:hover{background:rgba(0,0,0,.02)}
+.backup-meta{line-height:1.4}.backup-meta .backup-date{font-weight:600}.backup-meta .backup-info{font-size:10px;color:var(--text-muted)}
+.del-select-bar{padding:10px 14px;background:var(--warning-light);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.del-select-bar span{font-size:12px;font-weight:600;color:var(--text)}
+.manage-search{padding:5px 9px;border:1px solid var(--border);border-radius:5px;font-size:11px;width:100%;max-width:250px;font-family:var(--font)}
+.manage-search:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+
+/* Edit room name inline */
+.edit-room-name{border:1px solid var(--primary);border-radius:4px;padding:2px 6px;font-size:11px;font-family:var(--font);width:100px;outline:none}
+.edit-room-name:focus{box-shadow:0 0 0 3px var(--primary-light)}
+.del-room-item .btn-outline{margin-right:2px}
+
+/* Edit guest modal */
+.edit-form{display:flex;flex-direction:column;gap:10px;padding:4px 0}
+.edit-form .form-group{margin:0}
+.edit-form .form-group label{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;display:block}
+.edit-form .form-group input,.edit-form .form-group select{padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-size:12px;width:100%;background:var(--surface);font-family:var(--font)}
+.edit-form .form-group input:focus,.edit-form .form-group select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.edit-form .edit-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.edit-form .btn-row{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+
+/* Bookings sort controls */
+.sort-controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.sort-controls label{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px}
+.sort-controls select{padding:4px 7px;border:1px solid var(--border);border-radius:5px;font-size:11px;background:var(--surface);font-family:var(--font)}
+.bookings-search{padding:5px 9px;border:1px solid var(--border);border-radius:5px;font-size:11px;width:180px;font-family:var(--font)}
+.bookings-search:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+
+/* Room sort */
+.room-sort-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+
+/* Settings panel */
+.settings-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center}
+.settings-overlay.show{display:flex}
+.settings-panel{background:var(--surface);border-radius:12px;padding:20px 24px;width:350px;max-width:90vw;box-shadow:var(--shadow-lg)}
+.settings-panel h3{font-size:16px;font-weight:700;color:var(--accent);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.settings-panel h3 .close-settings{cursor:pointer;font-size:20px;color:var(--text-muted);background:none;border:none}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
+.settings-row:last-child{border-bottom:none}
+.settings-row label{font-size:13px;font-weight:600;color:var(--text)}
+.settings-row select,.settings-row input[type="range"]{padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);font-family:var(--font)}
+.settings-row input[type="range"]{width:120px;accent-color:var(--primary)}
+.settings-row .fs-val{font-size:12px;color:var(--text-muted);min-width:34px;text-align:center}
+/* Upcoming (future) guest tags */
+.guest-tag.upcoming{opacity:.55;border-style:dashed !important;font-style:italic}
+.guest-tag.upcoming::after{content:' ⏳';font-style:normal;font-size:9px}
+.upcoming-label{font-size:8px;color:var(--text-light);font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-top:2px}
+
+.gear-btn{background:none;border:none;color:rgba(255,255,255,.8);font-size:16px;cursor:pointer;padding:4px 6px;border-radius:6px;transition:all .15s}
+.gear-btn:hover{color:#fff;background:rgba(255,255,255,.1)}
+.fullscreen-btn{background:rgba(255,255,255,.12);border:none;color:rgba(255,255,255,.8);font-size:12px;cursor:pointer;padding:4px 10px;border-radius:6px;font-weight:600;transition:all .15s}
+.fullscreen-btn:hover{color:#fff;background:rgba(255,255,255,.2)}
+
+/* Drag and drop + click-to-move */
+.guest-tag{cursor:pointer}
+.guest-tag:hover{filter:brightness(0.92);transform:scale(1.02)}
+.guest-tag.dragging{opacity:.4}
+.move-hint{background:var(--accent-light);border:1px solid var(--border);border-radius:6px;padding:5px 12px;font-size:11px;font-weight:600;color:var(--accent);display:flex;align-items:center;gap:6px}
+.guest-tag.selected-for-move{outline:3px solid var(--primary);outline-offset:1px;animation:pulse-select 1s infinite;box-shadow:0 0 8px rgba(205,9,71,.4)}
+@keyframes pulse-select{0%,100%{outline-color:var(--primary)}50%{outline-color:var(--warning)}}
+.bedroom.drag-over,.bedroom.click-target{background:var(--primary-light);border:2px dashed var(--primary);border-radius:6px;cursor:pointer}
+.bedroom.drag-warn{background:var(--warning-light);border:2px dashed var(--warning);border-radius:6px}
+.bedroom.drag-invalid{background:var(--danger-light);border:2px dashed var(--danger);border-radius:6px}
+.move-banner{position:fixed;top:0;left:0;right:0;background:var(--primary);color:#fff;padding:10px 20px;font-size:14px;font-weight:700;text-align:center;z-index:9998;display:none;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.move-banner.show{display:flex;align-items:center;justify-content:center;gap:12px}
+.move-banner button{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer}
+.move-banner button:hover{background:rgba(255,255,255,.3)}
+#overrideModal,#confirmModal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;align-items:center;justify-content:center}
+.override-modal-backdrop{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5)}
+.override-modal-box{position:relative;background:var(--surface);border-radius:12px;padding:24px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.override-modal-title{font-size:18px;font-weight:700;margin-bottom:12px;color:var(--warning)}
+.override-modal-body{font-size:14px;line-height:1.5;color:var(--text)}
+.override-modal-body p{margin:0}
+.override-modal-actions{margin-top:20px;display:flex;gap:10px;justify-content:flex-end}
+.btn-danger{background:var(--danger);color:#fff;border:none}
+.btn-danger:hover{background:#a5082f}
+.room-card.drag-highlight{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-light)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span class="wlf-badge">WLF7</span> Room Allocation System</h1>
+  <div class="header-right">
+    <span class="sync-badge" id="syncBadge">⏳ Loading…</span>
+    <div class="header-stats" id="headerStats"></div>
+  </div>
+</div>
+
+<!-- SETTINGS OVERLAY -->
+<div class="settings-overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
+  <div class="settings-panel">
+    <h3>Display Settings <button class="close-settings" onclick="closeSettings()">✕</button></h3>
+    <div class="settings-row">
+      <label>Font Family</label>
+      <select id="settingsFont" onchange="applyFont(this.value)">
+        <option value="'Segoe UI',-apple-system,BlinkMacSystemFont,system-ui,sans-serif">System Default</option>
+        <option value="'Inter',sans-serif">Inter</option>
+        <option value="'Roboto',sans-serif">Roboto</option>
+        <option value="'Noto Sans',sans-serif">Noto Sans</option>
+        <option value="'Lato',sans-serif">Lato</option>
+        <option value="'Open Sans',sans-serif">Open Sans</option>
+        <option value="Georgia,serif">Georgia (Serif)</option>
+        <option value="'Courier New',monospace">Monospace</option>
+      </select>
+    </div>
+    <div class="settings-row">
+      <label>Font Size</label>
+      <input type="range" id="settingsSize" min="11" max="22" value="15" oninput="applyFontSize(this.value)">
+      <span class="fs-val" id="fsVal">15px</span>
+    </div>
+  </div>
+</div>
+
+<!-- BOOKING FORM -->
+<div class="booking-section">
+  <div class="booking-title">
+    <span>New Reservation</span>
+    <label class="admin-toggle"><input type="checkbox" id="adminOverride" onchange="toggleIdFields()"> Admin Override (skip ID fields)</label>
+  </div>
+  <div class="bf-grid">
+    <div class="form-group"><label>Guest Name</label><input type="text" id="guestName" placeholder="Full name"></div>
+    <div class="form-group"><label>Gender</label>
+      <div class="radio-row">
+        <div class="radio-pill"><input type="radio" name="gender" id="gMale" value="male" checked><label for="gMale">♂ Male</label></div>
+        <div class="radio-pill"><input type="radio" name="gender" id="gFemale" value="female"><label for="gFemale">♀ Female</label></div>
+      </div>
+    </div>
+    <div class="form-group"><label>Booking Type</label>
+      <div class="radio-row">
+        <div class="radio-pill"><input type="radio" name="bookingType" id="bSingle" value="single" checked onchange="toggleCouple()"><label for="bSingle">Single</label></div>
+        <div class="radio-pill"><input type="radio" name="bookingType" id="bCouple" value="couple" onchange="toggleCouple()"><label for="bCouple">Couple</label></div>
+      </div>
+    </div>
+    <div class="form-group"><label>Room Category</label>
+      <select id="roomCategory" onchange="updateCategoryHint()">
+        <option value="auto">Auto (best fit)</option>
+        <option value="standard">Standard (1-bed)</option>
+        <option value="deluxe">Deluxe (2-bed)</option>
+        <option value="hostel-f">Hostel – Female</option>
+        <option value="hostel-m1">Hostel – Male 1-bed</option>
+        <option value="hostel-m2">Hostel – Male 2-bed</option>
+        <option value="hospital-f">Hospital – Female</option>
+        <option value="hospital-m">Hospital – Male</option>
+      </select>
+    </div>
+    <div class="couple-row" id="coupleRow"><label>Partner Name</label><input type="text" id="partnerName" placeholder="Partner's name"></div>
+    <div class="form-group"><label>Nationality</label>
+      <select id="nationality" onchange="toggleIdFields()">
+        <option value="Indian">Indian</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="form-group" id="aadhaarGroup"><label>Aadhaar Number</label><input type="text" id="aadhaarNum" placeholder="12-digit Aadhaar" maxlength="14"></div>
+    <div class="form-group" id="passportGroup" style="display:none"><label>Passport Number</label><input type="text" id="passportNum" placeholder="Passport no."></div>
+    <div class="form-group" id="visaGroup" style="display:none"><label>Visa Number</label><input type="text" id="visaNum" placeholder="Visa no."></div>
+    <div class="upload-group" id="passportUploadGroup" style="display:none"><label>Passport Scan</label><div class="upload-btn" id="passportUploadBtn" onclick="triggerUpload('passport')">📄 Upload passport</div><input type="file" id="passportFile" accept="image/*" style="display:none" onchange="handleFileSelect('passport',event)"></div>
+    <div class="upload-group" id="visaUploadGroup" style="display:none"><label>Visa Stamp</label><div class="upload-btn" id="visaUploadBtn" onclick="triggerUpload('visa')">📄 Upload visa stamp</div><input type="file" id="visaFile" accept="image/*" style="display:none" onchange="handleFileSelect('visa',event)"></div>
+    <div class="form-group"><label>Check-in</label><input type="date" id="checkIn"></div>
+    <div class="form-group"><label>Check-out</label><input type="date" id="checkOut"></div>
+    <div class="form-group"><label>Room (optional)</label><input type="text" id="assignRoomSearch" placeholder="Search room…" oninput="filterAssignRoom()" style="margin-bottom:4px;font-size:11px"><select id="assignRoom"><option value="">Auto-assign</option></select></div>
+    <div style="display:flex;align-items:end"><button class="btn btn-primary" onclick="allocateGuest()" style="width:100%;height:36px;font-size:13px">Book Guest</button></div>
+  </div>
+  <div class="msg-bar" id="msgBar"></div>
+</div>
+
+<!-- MANUAL ASSIGN -->
+<div class="manual-section">
+  <div class="manual-title" onclick="toggleManual()"><span class="arrow" id="manualArrow">▶</span> Manual Room Assignment (move existing guest)</div>
+  <div class="manual-body" id="manualBody">
+    <p style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Move an existing guest to a different room/bed.</p>
+    <div class="manual-grid">
+      <div class="form-group"><label>Select Booking</label><input type="text" id="manualBookingSearch" placeholder="Type guest name…" oninput="filterManualBooking()" style="margin-bottom:4px;font-size:11px"><select id="manualBooking"><option value="">— select a guest —</option></select></div>
+      <div class="form-group"><label>Target Room</label><input type="text" id="manualRoomSearch" placeholder="Type room name…" oninput="filterManualRoom()" style="margin-bottom:4px;font-size:11px"><select id="manualRoom"><option value="">— select room —</option></select></div>
+      <div class="form-group"><label>Target Bed</label><select id="manualBed"><option value="0">Bed 1</option><option value="1">Bed 2</option></select></div>
+      <div style="display:flex;align-items:end"><button class="btn btn-accent" onclick="manualAssign()">Move Guest</button></div>
+    </div>
+    <div class="msg-bar" id="manualMsg"></div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tab-bar">
+  <div class="tab active" data-view="dashboard" onclick="switchView('dashboard')">📊 Dashboard</div>
+  <div class="tab" data-view="rooms" onclick="switchView('rooms')">Rooms</div>
+  <div class="tab" data-view="calendar" onclick="switchView('calendar')">Calendar</div>
+  <div class="tab" data-view="bookings" onclick="switchView('bookings')">Bookings</div>
+  <div class="tab" data-view="manage" onclick="switchView('manage')">Manage</div>
+  <div class="tab" data-view="editlog" onclick="switchView('editlog')">Edit Log</div>
+  <div class="tab" data-view="backups" onclick="switchView('backups')">Backups</div>
+  <div class="tab" data-view="formc" onclick="switchView('formc')" style="color:rgba(255,200,100,.9)">🛂 Form C</div>
+  <div class="tab-actions">
+    <button class="btn btn-success btn-sm" onclick="exportExcel()">⬇ Export</button>
+    <button class="btn btn-outline btn-sm" style="color:#fff;border-color:rgba(255,255,255,.3)" onclick="document.getElementById('importFile').click()">⬆ Import</button>
+    <button class="btn btn-outline btn-sm" style="color:#ffa;border-color:rgba(255,200,100,.4)" onclick="document.getElementById('csvResetFile').click()" title="Reset ALL data and import fresh from CSV">🔄 CSV Reset</button>
+    <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExcel(event)">
+    <input type="file" id="csvResetFile" accept=".csv,.xlsx,.xls" style="display:none" onchange="csvResetImport(event)">
+    <button class="fullscreen-btn" id="fsBtn" onclick="toggleFullscreen()" title="Toggle fullscreen">⛶ Fullscreen</button>
+    <button class="gear-btn" onclick="openSettings()" title="Display Settings">⚙</button>
+  </div>
+</div>
+
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div>Loading…</div>
+
+<!-- VIEW: ROOMS -->
+<!-- VIEW: DASHBOARD -->
+<div class="view active" id="view-dashboard">
+  <div class="dash" id="dashContent"></div>
+</div>
+
+<div class="view" id="view-rooms">
+  <div class="controls">
+    <label>Date:</label><input type="date" id="viewDate">
+    <input type="text" class="bookings-search" id="roomSearch2" placeholder="Search room/guest…" oninput="render()" style="max-width:160px">
+    <label>Sort:</label>
+    <select id="roomSort" onchange="render()">
+      <option value="default">Default</option>
+      <option value="name-asc">Name A→Z</option><option value="name-desc">Name Z→A</option>
+      <option value="occupancy-asc">Occupancy ↑</option><option value="occupancy-desc">Occupancy ↓</option>
+    </select>
+    <div class="spacer"></div>
+    <label>Filter:</label>
+    <select id="filterType" onchange="render()">
+      <option value="all">All Rooms</option>
+      <option value="available">Available</option><option value="partial">Partial</option><option value="full">Full</option>
+      <option value="standard">Standard</option><option value="deluxe">Deluxe</option>
+      <option value="hostel-f">Hostel Female</option><option value="hostel-m1">Hostel Male 1-Bed</option><option value="hostel-m2">Hostel Male 2-Bed</option>
+      <option value="hospital-f">Hospital Female</option><option value="hospital-m">Hospital Male</option>
+    </select>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--male)"></div> Male</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--female)"></div> Female</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--couple)"></div> Couple</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--success)"></div> Empty</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--warning)"></div> Partial</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--primary)"></div> Full</div>
+  </div>
+  <div class="move-hint">📌 <strong>To move a guest:</strong> Click their name → beds highlight → click target bed. Double-click name for details. Or use Manual Assignment above.</div>
+  <div class="rooms-wrap" id="roomsPanel"></div>
+</div>
+
+<!-- VIEW: CALENDAR -->
+<div class="view" id="view-calendar">
+  <div class="controls">
+    <div class="month-nav"><button onclick="navCal(-1)">◀</button><span class="month-label" id="calMonthLabel"></span><button onclick="navCal(1)">▶</button></div>
+    <div class="cal-view-toggle">
+      <button class="cal-view-btn active" data-mode="day" onclick="setCalView('day')">Day</button>
+      <button class="cal-view-btn" data-mode="week" onclick="setCalView('week')">Week</button>
+      <button class="cal-view-btn" data-mode="month" onclick="setCalView('month')">Month</button>
+      <button class="cal-view-btn" data-mode="full" onclick="setCalView('full')">Full</button>
+    </div>
+    <button class="cal-today-btn" onclick="calGoToday()">Today</button>
+    <input type="text" class="bookings-search" id="calSearch" placeholder="Search room…" oninput="renderCalendar()" style="max-width:140px">
+    <div class="spacer"></div>
+    <label>Filter:</label>
+    <select id="calFilter" onchange="renderCalendar()">
+      <option value="all">All Rooms</option>
+      <option value="standard">Standard</option><option value="deluxe">Deluxe</option>
+      <option value="hostel-f">Hostel Female</option><option value="hostel-m1">Hostel Male 1-Bed</option><option value="hostel-m2">Hostel Male 2-Bed</option>
+      <option value="hospital-f">Hospital Female</option><option value="hospital-m">Hospital Male</option>
+    </select>
+  </div>
+  <div class="cal-date-slider" id="calSliderRow">
+    <span class="slider-label" id="sliderStartLabel"></span>
+    <input type="range" id="calSlider" min="0" max="30" value="0" oninput="onCalSlider()">
+    <span class="slider-label" id="sliderEndLabel" style="text-align:right"></span>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--success)"></div> Empty</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--warning)"></div> Partial</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--primary)"></div> Full</div>
+  </div>
+  <div class="calendar-wrapper"><div class="calendar-table-wrap"><table class="calendar-table" id="calendarTable"></table></div></div>
+</div>
+
+<!-- VIEW: ALL BOOKINGS -->
+<div class="view" id="view-bookings">
+  <div class="controls" style="flex-wrap:wrap;gap:8px">
+    <label>Show:</label>
+    <select id="bookingsFilter" onchange="renderAllBookings()"><option value="all">All</option><option value="current">Current</option><option value="upcoming">Upcoming</option><option value="past">Past</option></select>
+    <label>Sort:</label>
+    <select id="bookingsSort" onchange="renderAllBookings()">
+      <option value="name-asc">Name A→Z</option><option value="name-desc">Name Z→A</option>
+      <option value="checkin-asc">Check-in ↑</option><option value="checkin-desc">Check-in ↓</option>
+      <option value="room-asc">Room A→Z</option><option value="room-desc">Room Z→A</option>
+      <option value="gender">Gender</option><option value="type">Room Type</option>
+    </select>
+    <label>Gender:</label>
+    <select id="bookingsGender" onchange="renderAllBookings()"><option value="all">All</option><option value="male">Male</option><option value="female">Female</option></select>
+    <label>Type:</label>
+    <select id="bookingsType" onchange="renderAllBookings()">
+      <option value="all">All Types</option>
+      <option value="standard">Standard</option><option value="deluxe">Deluxe</option>
+      <option value="hostel-f">Hostel F</option><option value="hostel-m1">Hostel M1</option><option value="hostel-m2">Hostel M2</option>
+      <option value="hospital-f">Hospital F</option><option value="hospital-m">Hospital M</option>
+    </select>
+    <input type="text" class="bookings-search" id="bookingsSearch" placeholder="Search guests…" oninput="renderAllBookings()">
+    <div class="spacer"></div><span style="font-size:11px;color:var(--text-muted)" id="bookingsCount"></span>
+  </div>
+  <div class="bookings-panel" style="padding-top:10px"><div class="booking-list-wrap" id="allBookingsList"></div></div>
+</div>
+
+<!-- VIEW: MANAGE ROOMS -->
+<div class="view" id="view-manage">
+  <div class="manage-wrap">
+    <div class="manage-grid">
+      <div class="manage-card">
+        <div class="manage-card-header">Add Rooms</div>
+        <div class="manage-card-body manage-form">
+          <div class="form-group"><label>Room Type</label>
+            <select id="addRoomType">
+              <option value="standard">Standard (1-bed, max 2)</option><option value="deluxe">Deluxe (2-bed, max 4)</option>
+              <option value="hostel-f">Hostel – Female (1-bed, max 2)</option><option value="hostel-m1">Hostel – Male 1-Bed (max 2)</option><option value="hostel-m2">Hostel – Male 2-Bed (max 4)</option>
+              <option value="hospital-f">Hospital – Female (1-bed, max 1)</option><option value="hospital-m">Hospital – Male (1-bed, max 1)</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Room Name / Number</label><input type="text" id="addRoomName" placeholder="e.g. HF076 or Room 301"></div>
+          <div class="form-group"><label>How many</label><input type="number" id="addRoomCount" value="1" min="1" max="200"></div>
+          <button class="btn btn-primary" onclick="addRooms()" style="margin-top:4px">Add Room(s)</button>
+          <div class="msg-bar" id="manageMsg"></div>
+        </div>
+      </div>
+      <div class="manage-card">
+        <div class="manage-card-header">Room Inventory</div>
+        <div class="room-type-list" id="roomInventory"></div>
+      </div>
+    </div>
+
+    <!-- Delete / Remove Rooms -->
+    <div class="delete-rooms-section">
+      <div class="manage-card">
+        <div class="manage-card-header">
+          <span>All Rooms <span style="font-weight:400;color:var(--text-muted);font-size:11px" id="totalRoomCount"></span></span>
+          <div style="display:flex;gap:5px;align-items:center">
+            <input type="text" class="manage-search" id="roomSearch" placeholder="Search rooms…" oninput="renderManageRoomList()">
+            <select id="roomListFilter" style="padding:4px 7px;border:1px solid var(--border);border-radius:5px;font-size:11px;font-family:var(--font)" onchange="renderManageRoomList()">
+              <option value="all">All types</option>
+              <option value="standard">Standard</option><option value="deluxe">Deluxe</option>
+              <option value="hostel-f">Hostel F</option><option value="hostel-m1">Hostel M1</option><option value="hostel-m2">Hostel M2</option>
+              <option value="hospital-f">Hospital F</option><option value="hospital-m">Hospital M</option>
+            </select>
+          </div>
+        </div>
+        <div id="bulkDeleteBar" style="display:none" class="del-select-bar">
+          <span id="bulkDeleteCount">0 selected</span>
+          <div style="display:flex;gap:5px">
+            <button class="btn btn-outline btn-sm" onclick="toggleSelectAll()">Select All Filtered</button>
+            <button class="btn btn-danger btn-sm" onclick="bulkDeleteRooms()">Delete Selected</button>
+            <button class="btn btn-outline btn-sm" onclick="clearSelection()">Cancel</button>
+          </div>
+        </div>
+        <div style="max-height:500px;overflow-y:auto" id="allRoomsList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW: EDIT LOG -->
+<div class="view" id="view-editlog">
+  <div class="manage-wrap">
+    <div class="manage-card">
+      <div class="manage-card-header">
+        <span>Edit Log</span>
+        <div style="display:flex;gap:5px;align-items:center">
+          <input type="text" id="logSearch" placeholder="Search log…" oninput="renderEditLog()" style="padding:4px 7px;border:1px solid var(--border);border-radius:5px;font-size:11px;font-family:var(--font);max-width:120px">
+          <select id="logFilter" style="padding:4px 7px;border:1px solid var(--border);border-radius:5px;font-size:11px;font-family:var(--font)" onchange="renderEditLog()">
+            <option value="all">All actions</option>
+            <option value="add">Add</option><option value="edit">Edit</option><option value="delete">Delete</option><option value="rename">Rename</option><option value="override">Override</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="clearEditLog()">Clear Log</button>
+        </div>
+      </div>
+      <div style="max-height:600px;overflow-y:auto;font-size:12px" id="editLogList"></div>
+      <div id="editLogEmpty" style="text-align:center;color:var(--text-muted);padding:40px;display:none">No edits logged yet. All future adds, moves, edits, and deletions will be tracked here with timestamps and user names.</div>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW: BACKUPS -->
+<div class="view" id="view-backups">
+  <div class="manage-wrap">
+    <div class="manage-card">
+      <div class="manage-card-header">
+        <span>Backups <span style="font-weight:400;color:var(--text-muted);font-size:11px">(auto every 6 hours, 10-day retention)</span></span>
+        <div style="display:flex;gap:5px;align-items:center">
+          <button class="btn btn-primary btn-sm" onclick="createBackupNow()">Backup Now</button>
+        </div>
+      </div>
+      <div id="backupStatus" style="padding:8px 12px;font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border)">
+        Next auto-backup: calculating…
+      </div>
+      <div style="max-height:600px;overflow-y:auto" id="backupList"></div>
+      <div id="backupEmpty" style="text-align:center;color:var(--text-muted);padding:40px;display:none">No backups yet.</div>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW: FORM C -->
+<div class="view" id="view-formc">
+  <div class="manage-wrap">
+    <div class="manage-card">
+      <div class="manage-card-header">
+        <span>🛂 Form C — Foreign Guest Report <span style="font-weight:400;color:var(--text-muted);font-size:11px">(Bureau of Immigration, India)</span></span>
+        <div style="display:flex;gap:5px;align-items:center">
+          <button class="btn btn-primary btn-sm" onclick="generateDailyFormC()">📋 Daily Report</button>
+          <button class="btn btn-accent btn-sm" onclick="generateFormCReport()">📄 Full Report</button>
+          <button class="btn btn-success btn-sm" onclick="exportFormCExcel()">⬇ Export Excel</button>
+        </div>
+      </div>
+      <div style="padding:10px 12px;font-size:12px;border-bottom:1px solid var(--border);background:var(--warning-light);color:var(--text)">
+        <strong>ℹ Form C</strong> must be submitted within 24 hours of a foreign guest's arrival via <a href="https://indianfrro.gov.in/frro/FormC" target="_blank" style="color:var(--primary)">indianfrro.gov.in</a>. Required: Guest details, passport copy, visa copy.
+        <strong>Daily reports</strong> run automatically at 9 PM IST. Manual reports can be generated anytime.
+      </div>
+      <div class="controls" style="border-top:none">
+        <label>As of Date:</label><input type="date" id="formcDate">
+        <label>View:</label>
+        <select id="formcFilter" onchange="renderFormC()">
+          <option value="current">Currently Staying</option>
+          <option value="arriving">Arriving Today</option>
+          <option value="departing">Departing Today</option>
+          <option value="all">All Foreign Guests</option>
+          <option value="missing">Missing Documents</option>
+        </select>
+        <input type="text" class="bookings-search" id="formcSearch" placeholder="Search name…" oninput="renderFormC()" style="max-width:160px">
+        <div class="spacer"></div>
+        <span id="formcCount" style="font-size:11px;font-weight:600;color:var(--primary)"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="calendar-table" style="width:100%" id="formcTable">
+          <thead><tr>
+            <th style="text-align:left;padding:6px 8px;font-size:11px">#</th>
+            <th style="text-align:left;padding:6px 8px;font-size:11px">Guest Name</th>
+            <th style="text-align:left;padding:6px 8px;font-size:11px">Nationality</th>
+            <th style="text-align:left;padding:6px 8px;font-size:11px">Gender</th>
+            <th style="text-align:left;padding:6px 8px;font-size:11px">Room</th>
+            <th style="text-align:left;padding:6px 8px;font-size:11px">Check-in</th>
+            <th style="text-align:left;padding:6px 8px;font-size:11px">Check-out</th>
+            <th style="text-align:left;padding:6px 8px;font-size:11px">Passport No.</th>
+            <th style="text-align:left;padding:6px 8px;font-size:11px">Visa No.</th>
+            <th style="text-align:left;padding:6px 8px;font-size:11px">Docs</th>
+            <th style="text-align:left;padding:6px 8px;font-size:11px">Form C Status</th>
+          </tr></thead>
+          <tbody id="formcBody"></tbody>
+        </table>
+      </div>
+      <div id="formcEmpty" style="text-align:center;color:var(--text-muted);padding:40px;display:none">No foreign guests found.</div>
+    </div>
+    <!-- Daily Report History -->
+    <div class="manage-card" style="margin-top:12px">
+      <div class="manage-card-header">
+        <span>📅 Daily Report History</span>
+        <span id="formcHistoryCount" style="font-size:11px;font-weight:600;color:var(--text-muted)"></span>
+      </div>
+      <div id="formcHistoryList" style="max-height:300px;overflow-y:auto;padding:8px 12px">
+        <div style="text-align:center;color:var(--text-light);padding:20px;font-size:12px">No daily reports generated yet.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="move-banner" id="moveBanner"><span id="moveBannerText">Moving guest...</span><button onclick="cancelClickMove()">✕ Cancel</button></div>
+<div class="tooltip" id="tooltip"></div>
+
+<!-- Guest detail modal -->
+<div class="modal-overlay" id="guestModal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><h3 id="modalTitle">Guest Details</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-body-inner" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+const ROOM_TYPES={
+  'standard':   {label:'Standard',            beds:1,maxPerBed:2,max:2,gender:null,    badge:'badge-standard',   prefix:'Room '},
+  'deluxe':     {label:'Deluxe',              beds:2,maxPerBed:2,max:4,gender:null,    badge:'badge-deluxe',     prefix:'Room '},
+  'hostel-f':   {label:'Hostel – Female',     beds:1,maxPerBed:2,max:2,gender:'female',badge:'badge-hostel-f',   prefix:'F'},
+  'hostel-m1':  {label:'Hostel – Male 1-Bed', beds:1,maxPerBed:2,max:2,gender:'male',  badge:'badge-hostel-m',   prefix:'M'},
+  'hostel-m2':  {label:'Hostel – Male 2-Bed', beds:2,maxPerBed:2,max:4,gender:'male',  badge:'badge-hostel-m',   prefix:'M'},
+  'hospital-f': {label:'Hospital – Female',   beds:1,maxPerBed:1,max:1,gender:'female',badge:'badge-hospital-f', prefix:'HF'},
+  'hospital-m': {label:'Hospital – Male',     beds:1,maxPerBed:1,max:1,gender:'male',  badge:'badge-hospital-m', prefix:'HM'}
+};
+
+function defaultRooms(){
+  const r=[];let i;
+  [["r-1","NT2-801"],["r-2","NT2-802"],["r-3","NT2-701"],["r-4","NT2-702"],["r-5","NT2-703"],["r-6","NT2-304"],["r-7","NT2-1002"],["r-8","NT2-1305"],["r-9","NT2-1504"],["r-10","NT2-1601"],["r-11","NT2-1605"],["r-12","NT2-1606"],["r-13","NT2-1106"],["r-14","NT2-1602"],["r-15","NT2-1701"],["r-16","NT2-1702"],["r-17","NT2-1705"],["r-18","NT2-1706"]].forEach(p=>r.push({id:p[0],name:p[1],type:"deluxe"}));
+  [["r-19","NT1-101"],["r-20","NT1 505"],["r-21","NT1-201"],["r-22","NT1-302"],["r-23","NT1-401"],["r-24","NT1-402"],["r-25","NT1-403"],["r-26","NT1-504"],["r-27","NT1-602"],["r-28","NT1-603"],["r-29","NT1-704"],["r-30","NT1-705"],["r-31","NT1-1004"],["r-32","NT1/1005"],["r-33","NT1/1006"]].forEach(p=>r.push({id:p[0],name:p[1],type:"standard"}));
+  r.find(x=>x.id==='r-19').maxOverride=3;
+  [["r-34","1101"],["r-35","1102"],["r-36","1103"],["r-37","1104"],["r-38","1105"],["r-39","1106"],["r-40","1107"],["r-41","1108"],["r-42","1109"],["r-43","1110"],["r-44","1111"],["r-45","1112"],["r-46","1113"],["r-47","1114"],["r-48","1115"],["r-49","1116"],["r-50","1117"],["r-51","1118"],["r-52","1119"],["r-53","1120"],["r-54","1121"],["r-55","1122"],["r-56","1123"],["r-57","1124"],["r-58","1201"],["r-59","1202"],["r-60","1203"],["r-61","1204"],["r-62","1205"],["r-63","1206"],["r-64","1207"],["r-65","1208"],["r-66","1209"],["r-67","1210"],["r-68","1211"],["r-69","1212"],["r-70","1213"],["r-71","1214"],["r-72","1215"],["r-73","1216"],["r-74","1217"],["r-75","1218"],["r-76","1219"],["r-77","1220"],["r-78","1221"],["r-79","1222"],["r-80","1223"],["r-81","1224"],["r-82","1301"],["r-83","1302"],["r-84","1303"],["r-85","1304"],["r-86","1305"],["r-87","1306"],["r-88","1307"],["r-89","1308"],["r-90","1309"],["r-91","1310"],["r-92","1311"],["r-93","1312"],["r-94","1313"],["r-95","1314"],["r-96","1315"],["r-97","1316"],["r-98","1317"],["r-99","1318"],["r-100","1319"],["r-101","1320"],["r-102","1321"],["r-103","1322"],["r-104","1323"],["r-105","1324"]].forEach(p=>r.push({id:p[0],name:p[1],type:"hostel-f"}));
+  [["r-106","1601"],["r-107","1602"],["r-108","1603"],["r-109","1604"],["r-110","1605"],["r-111","1606"],["r-112","1607"],["r-113","1608"],["r-114","1609"],["r-115","1610"],["r-116","1611"],["r-117","1612"],["r-118","1613"],["r-119","1614"],["r-120","1615"],["r-121","1616"],["r-122","1617"],["r-123","1618"],["r-124","1619"],["r-125","1620"],["r-126","1621"],["r-127","1622"],["r-128","1623"],["r-129","1624"],["r-138","603"],["r-139","604"],["r-140","605"],["r-141","606"],["r-142","607"],["r-143","701"],["r-144","702"],["r-145","703"],["r-146","704"],["r-147","705"],["r-148","706"],["r-149","707"],["r-150","708"],["r-151","M-UA151"],["r-152","M-UA152"],["r-153","M-UA153"],["r-154","M-UA154"],["r-155","M-UA155"],["r-156","M-UA156"]].forEach(p=>r.push({id:p[0],name:p[1],type:"hostel-m1"}));
+  [["r-130","405"],["r-131","406"],["r-132","504"],["r-133","505"],["r-134","506"],["r-135","507"],["r-136","508"],["r-137","602"]].forEach(p=>r.push({id:p[0],name:p[1],type:"hostel-m2"}));
+  [["r-165","HF001"],["r-166","HF002"],["r-167","HF003"],["r-168","HF004"],["r-169","HF005"],["r-170","HF006"],["r-171","HF007"],["r-172","HF008"],["r-173","HF009"],["r-174","HF010"],["r-180","HF011"],["r-185","HF012"],["r-186","HF013"],["r-187","HF014"],["r-188","HF015"],["r-189","HF016"],["r-190","HF017"],["r-191","HF018"],["r-192","HF019"],["r-193","HF020"],["r-194","HF021"],["r-195","HF022"],["r-196","HF023"],["r-197","HF024"],["r-198","HF025"],["r-199","HF026"],["r-200","HF027"],["r-201","HF028"],["r-202","HF029"],["r-203","HF030"],["r-204","HF031"],["r-205","HF032"],["r-206","HF033"],["r-207","HF034"],["r-208","HF035"],["r-209","HF036"],["r-210","HF037"],["r-211","HF038"],["r-212","HF039"],["r-213","HF040"],["r-214","HF041"],["r-215","HF042"],["r-216","HF043"],["r-217","HF044"],["r-218","HF045"],["r-219","HF046"],["r-220","HF047"],["r-221","HF048"],["r-222","HF049"],["r-223","HF050"],["r-224","HF051"],["r-225","HF052"],["r-226","HF053"],["r-227","HF054"],["r-228","HF055"],["r-229","HF056"],["r-230","HF057"],["r-231","HF058"],["r-232","HF059"],["r-233","HF060"],["r-234","HF061"],["r-235","HF062"],["r-236","HF063"],["r-237","HF064"],["r-238","HF065"],["r-239","HF066"],["r-240","HF067"],["r-241","HF068"],["r-242","HF069"],["r-243","HF070"],["r-244","HF071"],["r-245","HF072"],["r-246","HF073"],["r-247","HF074"],["r-248","HF075"]].forEach(p=>r.push({id:p[0],name:p[1],type:"hospital-f"}));
+  [["r-157","HM001"],["r-158","HM002"],["r-159","HM003"],["r-160","HM004"],["r-161","HM005"],["r-162","HM006"],["r-163","HM007"],["r-164","HM008"],["r-175","HM009"],["r-176","HM010"],["r-177","HM011"],["r-178","HM012"],["r-179","HM013"],["r-181","HM014"],["r-182","HM015"],["r-183","HM016"],["r-184","HM017"],["r-249","HM018"],["r-250","HM019"],["r-251","HM020"],["r-252","HM021"],["r-253","HM022"],["r-254","HM023"],["r-255","HM024"],["r-256","HM025"],["r-257","HM026"],["r-258","HM027"],["r-259","HM028"],["r-260","HM029"],["r-261","HM030"],["r-262","HM031"],["r-263","HM032"],["r-264","HM033"],["r-265","HM034"],["r-266","HM035"],["r-267","HM036"],["r-268","HM037"],["r-269","HM038"],["r-270","HM039"],["r-271","HM040"],["r-272","HM041"],["r-273","HM042"],["r-274","HM043"],["r-275","HM044"],["r-276","HM045"],["r-277","HM046"],["r-278","HM047"],["r-279","HM048"],["r-280","HM049"],["r-281","HM050"],["r-282","HM051"],["r-283","HM052"],["r-284","HM053"],["r-285","HM054"],["r-286","HM055"],["r-287","HM056"],["r-288","HM057"],["r-289","HM058"],["r-290","HM059"],["r-291","HM060"],["r-292","HM061"],["r-293","HM062"],["r-294","HM063"],["r-295","HM064"],["r-296","HM065"],["r-297","HM066"],["r-298","HM067"],["r-299","HM068"],["r-300","HM069"],["r-301","HM070"],["r-302","HM071"],["r-303","HM072"],["r-304","HM073"],["r-305","HM074"],["r-306","HM075"]].forEach(p=>r.push({id:p[0],name:p[1],type:"hospital-m"}));
+  return r;
+}
+
+function defaultBookings(){
+  return [[1,"Dr Maneesha","female","r-1",0,"2026-11-11","2026-12-02","Indian"],[2,"Hema","female","r-1",0,"2026-11-11","2026-12-02","Indian"],[3,"Hari","male","r-1",1,"2026-11-11","2026-12-02","Indian"],[4,"Amrita Nambiar","female","r-1",1,"2026-11-11","2026-12-02","Indian"],[5,"Dr Karen Sneha","female","r-2",0,"2026-11-21","2026-12-02","Indian"],[6,"Dr Bhavani","female","r-2",0,"2026-11-21","2026-12-02","Indian"],[7,"Sujatha Ma'am","female","r-3",0,"2026-11-02","2026-12-02","Indian"],[8,"Dhanya Miss","female","r-3",0,"2026-11-02","2026-12-02","Indian"],[9,"Ambili","female","r-3",1,"2026-11-02","2026-12-02","Indian"],[10,"Nirmala Miss","female","r-3",1,"2026-11-02","2026-12-02","Indian"],[11,"Alka Miss","female","r-3",1,"2026-11-02","2026-12-02","Indian"],[12,"Dr. Prema Nedungadi","female","r-4",0,"2026-11-06","2026-12-02","Indian"],[13,"Dr. Raghu Raman","male","r-4",0,"2026-11-06","2026-12-02","Indian"],[14,"Sudarshan Sir","male","r-5",0,"2026-11-10","2026-12-02","Indian"],[15,"Balaji Sir","male","r-5",0,"2026-11-10","2026-12-02","Indian"],[16,"Wadhavan Sir","male","r-5",1,"2026-11-10","2026-12-02","Indian"],[17,"Unnikrishnan Sir","male","r-5",1,"2026-11-10","2026-12-02","Indian"],[18,"Dr Adityan","male","r-6",0,"2026-11-02","2026-12-02","Indian"],[19,"Harshamrita Ji","male","r-6",0,"2026-11-02","2026-12-02","Indian"],[20,"Dr Sangeeth","male","r-6",1,"2026-11-02","2026-12-02","Indian"],[21,"Balmukund","male","r-7",0,"2026-11-16","2026-12-02","Indian"],[22,"Nithin","male","r-7",0,"2026-11-16","2026-12-02","Indian"],[23,"Dr dhanya","female","r-8",0,"2026-11-13","2026-12-02","Indian"],[24,"Sindhu Ma'am","female","r-9",0,"2026-11-21","2026-12-02","Indian"],[25,"Dr. Manoj","male","r-9",0,"2026-11-21","2026-12-02","Indian"],[26,"Dr Balakrishnan","male","r-9",1,"2026-11-21","2026-12-02","Indian"],[27,"Mr Vinod Menon","male","r-10",0,"2026-11-21","2026-12-02","Indian"],[28,"Mr Jeedesh","male","r-10",0,"2026-11-21","2026-12-02","Indian"],[29,"Mr Rakesh P","male","r-10",1,"2026-11-21","2026-12-02","Indian"],[30,"Kotluri Sravan Kumar","male","r-14",0,"2026-11-22","2026-12-02","Indian"],[31,"Thatikonda suresh kumar","male","r-14",0,"2026-11-22","2026-12-02","Indian"],[32,"HEWA WALAPITA GAMAGE PRAMODH THARANAGA GAMAGE","male","r-15",0,"2026-11-22","2026-12-02","Indian"],[33,"Arambegedara Ranjan Prasad Weerasinghe","male","r-15",0,"2026-11-22","2026-12-02","Indian"],[34,"MUNASINGHA DISSANAYAKAGE SANDARUWAN SUJEEWA KARUNARATHNA","male","r-15",1,"2026-11-22","2026-12-02","Indian"],[35,"K A D S B Jayathilake","male","r-15",1,"2026-11-22","2026-12-02","Indian"],[36,"DHARMA ARACHCHILAGE GIHAN MADUSANKA","male","r-15",1,"2026-11-22","2026-12-02","Indian"],[37,"Jayakrishnan Menon","male","r-16",0,"2026-11-22","2026-11-27","Indian"],[38,"Akshay Raj Manocha","male","r-17",0,"2026-11-21","2026-12-02","Indian"],[39,"Pawel Andrzej Kroh","male","r-17",0,"2026-11-21","2026-12-02","Indian"],[40,"Tran Trung Hieu","male","r-17",1,"2026-11-21","2026-12-02","Indian"],[41,"Lukasz Pawlik","male","r-17",1,"2026-11-21","2026-12-02","Indian"],[42,"Carlota Amalia Gutierrez","female","r-18",0,"2026-11-21","2026-12-02","Indian"],[43,"Shobhana Lakhera","female","r-18",0,"2026-11-21","2026-12-02","Indian"],[44,"antonin","male","r-18",1,"2026-11-21","2026-12-02","Indian"],[45,"Gokcen Gokceoglu","female","r-18",1,"2026-11-21","2026-12-02","Indian"],[46,"Br. Vishnu","male","r-19",0,"2026-11-02","2026-12-02","Indian"],[205,"Br. Suraj","male","r-19",0,"2026-11-02","2026-12-02","Indian"],[47,"Jayamohan","male","r-19",0,"2026-11-02","2026-12-02","Indian"],[48,"Plavita Baruah","female","r-20",0,"2026-11-21","2026-12-02","Indian"],[49,"Asokan Laila Achu","male","r-21",0,"2026-11-21","2026-11-27","Indian"],[50,"AJOY PAUL - Bangladesh","male","r-22",0,"2026-11-21","2026-12-02","Indian"],[51,"SUMIT PANDEY","male","r-23",0,"2026-11-22","2026-12-02","Indian"],[52,"KUSHANAV BHUYAN","male","r-24",0,"2026-11-21","2026-12-02","Indian"],[53,"Shreeja Das","female","r-25",0,"2026-11-22","2026-11-27","Indian"],[54,"Thenmozhi Mani","female","r-26",0,"2026-11-21","2026-12-02","Indian"],[55,"Girish Gopinath","male","r-27",0,"2026-11-21","2026-11-27","Indian"],[56,"Priyanka Ghosh","female","r-28",0,"2026-11-22","2026-11-27","Indian"],[57,"Praveen Kumar","male","r-30",0,"2026-11-21","2026-11-27","Indian"],[58,"Kabin Maharjan","male","r-31",0,"2026-11-22","2026-11-27","Indian"],[59,"Michel Nicolas Jaboyedoff","male","r-32",0,"2026-11-22","2026-12-02","Indian"],[60,"Nicolas Kyochi Oestreicher","male","r-33",0,"2026-11-23","2026-12-02","Indian"],[61,"Krishna Priya Velappan Kumari Lekha","female","r-34",0,"2026-11-21","2026-12-02","Indian"],[62,"Rehna C","female","r-35",0,"2026-11-21","2026-12-02","Indian"],[63,"Nivethiha P","female","r-36",0,"2026-11-21","2026-12-02","Indian"],[64,"Sruthi S Babu","female","r-37",0,"2026-11-21","2026-11-27","Indian"],[65,"Marina Barros Santander","female","r-38",0,"2026-11-21","2026-12-02","Indian"],[66,"Nikita Lahiri","female","r-39",0,"2026-11-21","2026-12-02","Indian"],[67,"Martina Possenelli","female","r-40",0,"2026-11-23","2026-12-02","Indian"],[68,"Ankita Borah","female","r-41",0,"2026-11-21","2026-12-02","Indian"],[69,"Nandana Unni N","female","r-42",0,"2026-11-22","2026-11-27","Indian"],[70,"Maria Asim","female","r-43",0,"2026-11-21","2026-11-27","Indian"],[71,"Vanlalhlimpuii","female","r-44",0,"2026-11-21","2026-12-02","Indian"],[72,"C Lalremruati","female","r-45",0,"2026-11-21","2026-12-02","Indian"],[73,"Aakriti Sharma","female","r-46",0,"2026-11-22","2026-11-27","Indian"],[74,"SUSHIKALI A KUHO","female","r-47",0,"2026-11-22","2026-11-27","Indian"],[75,"Susarla Naga Sai Mounika","female","r-48",0,"2026-11-23","2026-11-27","Indian"],[76,"HERATH MUDIYANSELAGE BADRA SRIYANI HERATH","female","r-49",0,"2026-11-22","2026-12-02","Indian"],[77,"ANAHA JOY","female","r-50",0,"2026-11-21","2026-12-02","Indian"],[78,"Isini Thisara Hewa Kokawalage","female","r-51",0,"2026-11-22","2026-12-02","Indian"],[79,"Posoni Himara Hewa Kokawalage","female","r-52",0,"2026-11-22","2026-12-02","Indian"],[80,"Navuluri Jayasri","female","r-53",0,"2026-11-22","2026-11-27","Indian"],[81,"Kamini Sharma","female","r-54",0,"2026-11-23","2026-11-27","Indian"],[82,"ANUPA CHAKRABORTY","female","r-55",0,"2026-11-22","2026-11-26","Indian"],[83,"DEVANSHI SHARMA","female","r-56",0,"2026-11-22","2026-12-02","Indian"],[84,"Writwika Manna","female","r-60",0,"2026-11-22","2026-12-02","Indian"],[85,"Anamika Sekar","female","r-61",0,"2026-11-21","2026-12-02","Indian"],[86,"Shivani Joshi","female","r-62",0,"2026-11-21","2026-12-02","Indian"],[87,"Nirmala Vasudevan","female","r-74",0,"2026-11-21","2026-12-02","Indian"],[88,"Dr Uma","female","r-75",0,"2026-11-21","2026-12-02","Indian"],[89,"Vidyasree Jayaprasad","female","r-76",0,"2026-11-21","2026-12-02","Indian"],[90,"Ambika P","female","r-77",0,"2026-11-21","2026-12-02","Indian"],[91,"Amritha T","female","r-78",0,"2026-11-21","2026-12-02","Indian"],[92,"Anagha Shaji","female","r-79",0,"2026-11-21","2026-12-02","Indian"],[93,"Anila Asokan","female","r-80",0,"2026-11-21","2026-12-02","Indian"],[94,"Aswathy KB","female","r-81",0,"2026-11-21","2026-12-02","Indian"],[95,"Divya SJ","female","r-82",0,"2026-11-21","2026-12-02","Indian"],[96,"Drisya","female","r-83",0,"2026-11-21","2026-12-02","Indian"],[97,"Gouri L Aji","female","r-84",0,"2026-11-21","2026-12-02","Indian"],[98,"Dr Parvathi","female","r-85",0,"2026-11-21","2026-12-02","Indian"],[99,"Aiswarya S","female","r-86",0,"2026-11-21","2026-12-02","Indian"],[100,"Abhila Raj","female","r-87",0,"2026-11-21","2026-12-02","Indian"],[101,"Saritha","female","r-88",0,"2026-11-21","2026-12-02","Indian"],[102,"Priyanga G","female","r-89",0,"2026-11-21","2026-12-02","Indian"],[103,"Divya Panchami","female","r-90",0,"2026-11-21","2026-12-02","Indian"],[104,"Chindu","female","r-91",0,"2026-11-21","2026-12-02","Indian"],[105,"Sreedevi RS","female","r-92",0,"2026-11-21","2026-12-02","Indian"],[106,"Rajeena","female","r-93",0,"2026-11-21","2026-12-02","Indian"],[107,"Lakshmi","female","r-94",0,"2026-11-21","2026-12-02","Indian"],[108,"Indukala","female","r-95",0,"2026-11-21","2026-12-02","Indian"],[109,"Anila Asokan","female","r-96",0,"2026-11-21","2026-12-02","Indian"],[110,"Amritha T","female","r-97",0,"2026-11-21","2026-12-02","Indian"],[111,"Dr Meenu","female","r-98",0,"2026-11-21","2026-12-02","Indian"],[112,"Dr Aiswarya","female","r-99",0,"2026-11-21","2026-12-02","Indian"],[113,"Dr Drishti","female","r-100",0,"2026-11-21","2026-12-02","Indian"],[114,"Dr Shruthy","female","r-101",0,"2026-11-21","2026-12-02","Indian"],[115,"Dr Raji","female","r-102",0,"2026-11-21","2026-12-02","Indian"],[116,"Sandhya Menon","female","r-103",0,"2026-11-21","2026-12-02","Indian"],[117,"Dr Aryadevi","female","r-104",0,"2026-11-21","2026-12-02","Indian"],[118,"Dr Radhagayathri","female","r-105",0,"2026-11-21","2026-12-02","Indian"],[119,"PARNAB SARKAR","male","r-106",0,"2026-11-22","2026-12-02","Indian"],[120,"Manish Dewrari","male","r-107",0,"2026-11-21","2026-12-02","Indian"],[121,"Madhukar Dwivedi","male","r-108",0,"2026-11-23","2026-11-27","Indian"],[122,"Sudhanshu Dixit","male","r-109",0,"2026-11-21","2026-12-02","Indian"],[123,"Jayrold Provendido Arcede","male","r-110",0,"2026-11-22","2026-12-02","Indian"],[124,"Navinkumar","male","r-111",0,"2026-11-21","2026-12-02","Indian"],[125,"Shubhesh Sharma","male","r-112",0,"2026-11-22","2026-12-02","Indian"],[126,"Lucas Pedrosa Soares","male","r-113",0,"2026-11-21","2026-12-02","Indian"],[127,"Novikov Pavel","male","r-114",0,"2026-11-21","2026-12-02","Indian"],[128,"Athul Joseph","male","r-115",0,"2026-11-23","2026-11-26","Indian"],[129,"Prodip Mandal","male","r-116",0,"2026-11-21","2026-11-27","Indian"],[130,"ANAND KUMAR GUPTA","male","r-117",0,"2026-11-22","2026-12-02","Indian"],[131,"NIMAI SINGHA","male","r-118",0,"2026-11-23","2026-11-27","Indian"],[132,"Gopal Kumar","male","r-119",0,"2026-11-21","2026-11-27","Indian"],[133,"Amit Vijaykumar Shirke","male","r-120",0,"2026-11-21","2026-11-27","Indian"],[134,"TUSHAR MARU","male","r-121",0,"2026-11-22","2026-11-24","Indian"],[135,"Takashi Kato","male","r-122",0,"2026-11-24","2026-12-02","Indian"],[136,"DINESH KUMAR SAHU","male","r-123",0,"2026-11-22","2026-12-02","Indian"],[137,"Isaac thomas","male","r-124",0,"2026-11-21","2026-12-02","Indian"],[138,"Arun Kumar","male","r-125",0,"2026-11-23","2026-11-27","Indian"],[139,"Manohara K N","male","r-126",0,"2026-11-21","2026-12-02","Indian"],[140,"AMAL S AJAY","male","r-127",0,"2026-11-21","2026-12-02","Indian"],[141,"Sumit Singh","male","r-128",0,"2026-11-22","2026-12-02","Indian"],[142,"PAVAN KUMAR B S","male","r-130",0,"2026-11-23","2026-11-27","Indian"],[143,"Soumya Kundu","male","r-130",0,"2026-11-22","2026-12-02","Indian"],[144,"Rohit Singh","male","r-131",0,"2026-11-24","2026-11-27","Indian"],[145,"Pratyush Pandey","male","r-131",0,"2026-11-24","2026-11-27","Indian"],[146,"Mohd Shawez","male","r-132",0,"2026-11-22","2026-11-27","Indian"],[147,"FAISAL IMAM UMRANI","male","r-132",0,"2026-11-21","2026-11-27","Indian"],[148,"AJESH SANKAR M","male","r-133",0,"2026-11-23","2026-11-26","Indian"],[149,"Priyajit Kundu","male","r-133",0,"2026-11-23","2026-11-26","Indian"],[150,"Nishon Tandukar","male","r-134",0,"2026-11-21","2026-12-02","Other"],[151,"Ken Adrian Villarias","male","r-134",0,"2026-11-22","2026-12-02","Other"],[152,"Kirti Kumar Mahanta","male","r-135",0,"2026-11-23","2026-11-27","Indian"],[153,"Avnish Verma","male","r-135",0,"2026-11-23","2026-11-27","Indian"],[154,"Shah Masudul Islam","male","r-136",0,"2026-11-21","2026-12-02","Indian"],[155,"Sahil Kaushal","male","r-136",0,"2026-11-21","2026-12-02","Indian"],[156,"Kaushik Ramanathan","male","r-137",0,"2026-11-21","2026-12-02","Indian"],[157,"Dr Anand Prem K","male","r-145",0,"2026-11-21","2026-12-02","Indian"],[158,"Dr Aravind","male","r-145",0,"2026-11-21","2026-12-02","Indian"],[159,"Jayaprasad","male","r-146",0,"2026-11-21","2026-12-02","Indian"],[160,"Krishnan Pillai","male","r-146",0,"2026-11-21","2026-12-02","Indian"],[161,"Sethu Sir","male","r-147",0,"2026-11-21","2026-12-02","Indian"],[162,"Ravi Halker","male","r-147",0,"2026-11-21","2026-12-02","Indian"],[163,"Dr Rahul","male","r-148",0,"2026-11-21","2026-12-02","Indian"],[164,"Mr Ramesh Sir","male","r-148",0,"2026-11-21","2026-12-02","Indian"],[165,"Dr Shiva Pratap","male","r-149",0,"2026-11-21","2026-12-02","Indian"],[166,"Dr Sabarinath","male","r-149",0,"2026-11-21","2026-12-02","Indian"],[167,"Dr Sabari","male","r-150",0,"2026-11-21","2026-12-02","Indian"],[168,"Mr Bichu","male","r-150",0,"2026-11-21","2026-12-02","Indian"],[169,"Akshat Vashistha","male","r-151",0,"2026-11-21","2026-12-02","Indian"],[170,"Ankush","male","r-152",0,"2026-11-24","2026-11-27","Indian"],[171,"GOKUL R KAMATH","male","r-153",0,"2026-11-21","2026-12-02","Indian"],[172,"Devi Lal","male","r-154",0,"2026-11-21","2026-11-25","Indian"],[173,"Muhandiramge Don Janaka Priyantha Wickramasooriya","male","r-155",0,"2026-11-21","2026-12-02","Other"],[174,"Konara Mudiyanselage Isuru Dissanayake","male","r-156",0,"2026-11-22","2026-12-02","Other"],[175,"Artist 1","male","r-157",0,"2026-11-01","2026-11-20","Indian"],[176,"Artist 2","male","r-158",0,"2026-11-01","2026-11-20","Indian"],[177,"Artist 3","male","r-159",0,"2026-11-01","2026-11-20","Indian"],[178,"Artist 4","male","r-160",0,"2026-11-01","2026-11-20","Indian"],[179,"Artist 5","male","r-161",0,"2026-11-01","2026-11-20","Indian"],[180,"Artist 6","male","r-162",0,"2026-11-01","2026-11-20","Indian"],[181,"Artist 7","male","r-163",0,"2026-11-01","2026-11-20","Indian"],[182,"Artist 8","male","r-164",0,"2026-11-01","2026-11-20","Indian"],[183,"Gayatri","female","r-165",0,"2026-11-13","2026-12-02","Indian"],[184,"Induja","female","r-166",0,"2026-11-13","2026-12-02","Indian"],[185,"Sanjeevani","female","r-167",0,"2026-11-13","2026-12-02","Indian"],[186,"A Vyshnavi","female","r-168",0,"2026-11-13","2026-12-02","Indian"],[187,"Gopika","female","r-169",0,"2026-11-13","2026-12-02","Indian"],[188,"Baby Lalvenhimi","female","r-170",0,"2026-11-21","2026-12-02","Indian"],[189,"Krishnapriya V Nair","female","r-171",0,"2026-11-21","2026-12-02","Indian"],[190,"Shivane S","female","r-172",0,"2026-11-21","2026-12-02","Indian"],[191,"Sanjana Suresh","female","r-173",0,"2026-11-21","2026-12-02","Indian"],[192,"Rithanya S","female","r-174",0,"2026-11-21","2026-12-02","Indian"],[193,"Mohith Balaji V","male","r-175",0,"2026-11-21","2026-12-02","Indian"],[194,"Mukunthan TM","male","r-176",0,"2026-11-21","2026-12-02","Indian"],[195,"Dinesh M","male","r-177",0,"2026-11-21","2026-12-02","Indian"],[196,"Narendhran K","male","r-178",0,"2026-11-21","2026-12-02","Indian"],[197,"Neeraj RB","male","r-179",0,"2026-11-21","2026-12-02","Indian"],[198,"Sneha Srenivasan","female","r-180",0,"2026-11-21","2026-12-02","Indian"],[199,"\u2060Akshay Sanyal","male","r-181",0,"2026-11-21","2026-12-02","Indian"],[200,"Amal Sunil Kumar","male","r-182",0,"2026-11-21","2026-12-02","Indian"],[201,"Bagyaprem","male","r-183",0,"2026-11-21","2026-12-02","Indian"],[202,"Vaishakh M V","male","r-184",0,"2026-11-21","2026-12-02","Indian"],[203,"Meenakshi M","female","r-185",0,"2026-11-19","2026-12-02","Indian"],[204,"Neha Mariya Binu","female","r-186",0,"2026-11-19","2026-12-02","Indian"]].map(b=>({id:b[0],guestName:b[1],gender:b[2],isCouple:false,coupleId:null,roomId:b[3],bedroomIdx:b[4],checkIn:b[5],checkOut:b[6],nationality:b[7]||'',aadhaar:'',passport:'',visa:'',passportAssetId:null,visaAssetId:null}));
+}
+const DEFAULT_NEXT_BOOKING_ID=206;
+const DEFAULT_NEXT_ROOM_ID=307;
+
+let rooms=[],bookings=[],nextBookingId=1,nextRoomId=2000,calYear,calMonth,calDay,calViewMode='month';
+let db=null,downloads=null,assets=null,useCloudDb=false,saveTimeout=null,localDirty=false,saveVersion=0,lastSavedVersion=0,snapSuppressUntil=0,inflightSave=null;
+let pendingPassportFile=null,pendingVisaFile=null;
+let selectedRoomIds=new Set();
+
+// Persistence
+async function initPersistence(){
+  const badge=document.getElementById('syncBadge');
+  currentUser='admin';
+  // ═══════════════════════════════════════════════════════════════════
+  // FIREBASE CONFIG — Replace with YOUR Firebase project credentials
+  // Go to: Firebase Console → Project Settings → Your apps → Web app
+  // ═══════════════════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyAfDCmrqh_68jufYht-EungrRsf5rfYmZE",
+  authDomain: "wlf7-rooms.firebaseapp.com",
+  projectId: "wlf7-rooms",
+  storageBucket: "wlf7-rooms.firebasestorage.app",
+  messagingSenderId: "1064595594488",
+  appId: "1:1064595594488:web:3f370609c9a1887066af0d"
+};
+  // ═══════════════════════════════════════════════════════════════════
+
+  try{
+    if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    db=firebase.firestore();
+    useCloudDb=true;
+    badge.textContent='☁️ Firebase connected';
+    console.log('[WLF7] Firebase initialized successfully');
+  }catch(e){
+    console.error('[WLF7] Firebase init failed:',e);
+    db=null;useCloudDb=false;
+    badge.textContent='💾 Local only (Firebase error)';
+    loadLocal();loadEditLog();loadBackups();scheduleAutoBackup();showApp();render();
+    return;
+  }
+
+  // Load data from Firestore
+  try{
+    const doc=await db.collection('state').doc('data').get();
+    console.log('[WLF7-LOAD] get() result, exists:', doc.exists);
+    if(doc.exists){
+      const cloudData=doc.data();
+      if(cloudData&&cloudData.bookings&&cloudData.bookings.length>0){
+        rooms=cloudData.rooms||defaultRooms();bookings=cloudData.bookings;
+        nextBookingId=cloudData.nextBookingId||DEFAULT_NEXT_BOOKING_ID;
+        nextRoomId=cloudData.nextRoomId||DEFAULT_NEXT_ROOM_ID;
+        console.log('[WLF7-LOAD] ✅ Loaded from Firebase:',bookings.length,'bookings');
+      }else{
+        rooms=defaultRooms();bookings=defaultBookings();
+        nextBookingId=DEFAULT_NEXT_BOOKING_ID;nextRoomId=DEFAULT_NEXT_ROOM_ID;
+        console.log('[WLF7-LOAD] Empty cloud doc, using defaults');
+      }
+    }else{
+      rooms=defaultRooms();bookings=defaultBookings();
+      nextBookingId=DEFAULT_NEXT_BOOKING_ID;nextRoomId=DEFAULT_NEXT_ROOM_ID;
+      console.log('[WLF7-LOAD] No cloud doc yet, using defaults + saving initial data');
+      saveDataNow();
+    }
+  }catch(e){console.error('[WLF7-LOAD] ❌ Firebase load FAILED:',e);loadLocal();}
+
+  // Data migration: split combined booking
+  const combined=bookings.find(b=>b.id===46&&b.guestName.includes('Vishnu')&&b.guestName.includes('Suraj'));
+  if(combined&&!bookings.find(b=>b.id===205)){
+    combined.guestName='Br. Vishnu';
+    bookings.push({id:205,guestName:'Br. Suraj',gender:'male',roomId:combined.roomId,bedroomIdx:combined.bedroomIdx,checkIn:combined.checkIn,checkOut:combined.checkOut,isCouple:false,coupleId:null,nationality:'Indian',aadhaar:'',passport:'',visa:'',passportAssetId:null,visaAssetId:null});
+    if(nextBookingId<=205)nextBookingId=206;
+    saveDataNow();
+  }
+  loadDisplayFromCloud();loadFormCHistory();
+  await loadEditLog();await loadBackups();scheduleAutoBackup();
+  showApp();render();
+}
+function loadLocal(){try{const s=localStorage.getItem('roomAllocV9');if(s){const d=JSON.parse(s);rooms=d.rooms||defaultRooms();bookings=d.bookings||defaultBookings();nextBookingId=d.nextBookingId||DEFAULT_NEXT_BOOKING_ID;nextRoomId=d.nextRoomId||DEFAULT_NEXT_ROOM_ID;}else{rooms=defaultRooms();bookings=defaultBookings();nextBookingId=DEFAULT_NEXT_BOOKING_ID;nextRoomId=DEFAULT_NEXT_ROOM_ID;}}catch(e){rooms=defaultRooms();bookings=defaultBookings();nextBookingId=DEFAULT_NEXT_BOOKING_ID;nextRoomId=DEFAULT_NEXT_ROOM_ID;}}
+function saveData(){
+  const json=JSON.stringify({rooms,bookings,nextBookingId,nextRoomId});
+  try{localStorage.setItem('roomAllocV9',json);}catch(e){}
+  if(useCloudDb&&db){if(saveTimeout)clearTimeout(saveTimeout);saveVersion++;localDirty=true;const badge=document.getElementById('syncBadge');badge.textContent='⏳ Saving…';
+    const myVersion=saveVersion;const snapshot=JSON.parse(json);snapshot._savedAt=new Date().toISOString();
+    saveTimeout=setTimeout(async()=>{
+      let retries=0;
+      while(retries<3){
+        try{await db.collection('state').doc('data').set(snapshot);lastSavedVersion=myVersion;snapSuppressUntil=Date.now()+1500;if(saveVersion===myVersion){localDirty=false;}badge.textContent='☁️ Cloud synced';return;}
+        catch(e){retries++;if(retries<3)await new Promise(r=>setTimeout(r,500));}
+      }
+      badge.textContent='⚠️ Save failed';
+    },400);}
+}
+function saveDataNow(){
+  if(saveTimeout){clearTimeout(saveTimeout);saveTimeout=null;}
+  const json=JSON.stringify({rooms,bookings,nextBookingId,nextRoomId});
+  try{localStorage.setItem('roomAllocV9',json);}catch(e){}
+  if(useCloudDb&&db){
+    saveVersion++;localDirty=true;
+    const badge=document.getElementById('syncBadge');badge.textContent='⏳ Saving…';
+    const myVersion=saveVersion;const snapshot=JSON.parse(json);snapshot._savedAt=new Date().toISOString();
+    // Log what we're about to save (first 3 bookings' room assignments)
+    const preview=snapshot.bookings.slice(0,5).map(b=>`${b.id}:${b.guestName}→${b.roomId}/bed${b.bedroomIdx}`);
+    console.log('[WLF7-SAVE] Saving version '+myVersion+', bookings: '+snapshot.bookings.length+', sample: '+preview.join(', '));
+    const p=(async()=>{
+      let retries=0;
+      while(retries<3){
+        try{
+          await db.collection('state').doc('data').set(snapshot);
+          lastSavedVersion=myVersion;snapSuppressUntil=Date.now()+1500;
+          if(saveVersion===myVersion){localDirty=false;}
+          badge.textContent='☁️ Cloud synced';
+          console.log('[WLF7-SAVE] ✅ Cloud save SUCCESS, version '+myVersion);
+          inflightSave=null;return true;
+        }
+        catch(e){
+          console.error('[WLF7-SAVE] ❌ Cloud save FAILED attempt '+(retries+1)+':',e);
+          retries++;if(retries<3)await new Promise(r=>setTimeout(r,500));
+        }
+      }
+      badge.textContent='⚠️ Save failed';
+      console.error('[WLF7-SAVE] ❌ All 3 save attempts FAILED');
+      inflightSave=null;return false;
+    })();
+    inflightSave=p;
+    return p;
+  }
+  console.warn('[WLF7-SAVE] No cloud DB available, local only');
+  return Promise.resolve(true);
+}
+function flushPendingSave(){
+  if(saveTimeout){
+    clearTimeout(saveTimeout);saveTimeout=null;
+    if(useCloudDb&&db){
+      const json=JSON.stringify({rooms,bookings,nextBookingId,nextRoomId});
+      const snapshot=JSON.parse(json);snapshot._savedAt=new Date().toISOString();
+      try{db.collection('state').doc('data').set(snapshot);snapSuppressUntil=Date.now()+2000;localDirty=false;}catch(e){}
+    }
+  }
+  // If an async save is in-flight, try a synchronous write of latest state
+  if(inflightSave&&useCloudDb&&db){
+    const json=JSON.stringify({rooms,bookings,nextBookingId,nextRoomId});
+    const snapshot=JSON.parse(json);snapshot._savedAt=new Date().toISOString();
+    try{db.collection('state').doc('data').set(snapshot);snapSuppressUntil=Date.now()+2000;localDirty=false;}catch(e){}
+  }
+}
+window.addEventListener('pagehide',flushPendingSave);
+window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushPendingSave();});
+window.addEventListener('beforeunload',e=>{if(inflightSave||saveTimeout){e.preventDefault();e.returnValue='A save is in progress — leaving now may lose your changes.';}});
+function showSaveToast(msg){let t=document.getElementById('saveToast');if(!t){t=document.createElement('div');t.id='saveToast';t.style.cssText='position:fixed;top:12px;left:50%;transform:translateX(-50%);padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;color:#fff;z-index:99999;pointer-events:none;opacity:0;transition:opacity .3s';document.body.appendChild(t);}t.style.background=msg.startsWith('✅')?'#2e7d32':'#c62828';t.textContent=msg;t.style.opacity='1';clearTimeout(t._timer);t._timer=setTimeout(()=>{t.style.opacity='0';},2500);}
+function showApp(){document.getElementById('loadingOverlay').style.display='none';}
+
+// Helpers
+function getRoomDef(r){return ROOM_TYPES[r.type]||ROOM_TYPES['standard'];}
+function getEffectiveMaxPerBed(room){if(room.maxOverride!=null&&room.maxOverride>0)return room.maxOverride;return getRoomDef(room).maxPerBed;}
+function getEffectiveMax(room){const def=getRoomDef(room);if(room.maxOverride!=null&&room.maxOverride>0)return room.maxOverride*def.beds;return def.max;}
+function dateStr(d){if(typeof d==='string')return d;const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${dd}`;}
+function dateRange(ci,co){const dates=[];let d=new Date(ci);const end=new Date(co);while(d<end){dates.push(dateStr(d));d.setDate(d.getDate()+1);}return dates;}
+function getActiveBookings(date){return bookings.filter(b=>date>=b.checkIn&&date<b.checkOut);}
+function getRoomBookings(rid,date){return getActiveBookings(date).filter(b=>b.roomId===rid);}
+function getBedroomBookings(rid,bidx,date){return getRoomBookings(rid,date).filter(b=>b.bedroomIdx===bidx);}
+function getFutureBedroomBookings(rid,bidx,date){return bookings.filter(b=>b.roomId===rid&&b.bedroomIdx===bidx&&b.checkIn>date);}
+function getFutureRoomBookings(rid,date){return bookings.filter(b=>b.roomId===rid&&b.checkIn>date);}
+function getRoomOccupancy(rid,date){const room=rooms.find(r=>r.id===rid);if(!room)return{current:0,max:0};const def=getRoomDef(room);let t=0;for(let i=0;i<def.beds;i++)t+=getBedroomBookings(rid,i,date).length;return{current:t,max:getEffectiveMax(room)};}
+
+// Allocation
+function findBestRoom(gender,isCouple,checkIn,checkOut,category){
+  const dates=dateRange(checkIn,checkOut);
+  const eligible=rooms.filter(r=>{const def=getRoomDef(r);
+    if(category&&category!=='auto'&&r.type!==category)return false;
+    if(def.gender&&def.gender!==gender&&!isCouple)return false;
+    if(isCouple&&def.gender)return false;
+    if(isCouple&&r.type.startsWith('hospital'))return false;
+    return true;});
+  const cands=[];
+  for(const room of eligible){const def=getRoomDef(room);const effMpb=getEffectiveMaxPerBed(room);let bestBed=-1,minOcc=Infinity;
+    for(let bed=0;bed<def.beds;bed++){let ok=true,maxO=0;
+      for(const dt of dates){const bb=getBedroomBookings(room.id,bed,dt);const need=isCouple?2:1;
+        if(bb.length+need>effMpb){ok=false;break;}
+        if(!isCouple&&bb.length>0&&bb.filter(b=>!b.isCouple).some(b=>b.gender!==gender)){ok=false;break;}
+        if(isCouple&&bb.length>0){ok=false;break;}
+        if(!isCouple&&bb.some(b=>b.isCouple)){ok=false;break;}
+        maxO=Math.max(maxO,bb.length);}
+      if(ok&&maxO<minOcc){minOcc=maxO;bestBed=bed;}}
+    if(bestBed>=0)cands.push({room,bedroom:bestBed,occupancy:minOcc});}
+  cands.sort((a,b)=>{if(a.occupancy!==b.occupancy)return b.occupancy-a.occupancy;return getRoomDef(a.room).beds-getRoomDef(b.room).beds;});
+  return cands[0]||null;
+}
+function validateManualAssign(roomId,bedroomIdx,gender,isCouple,checkIn,checkOut,excludeBookingId){
+  const room=rooms.find(r=>r.id===roomId);if(!room)return'Room not found';const def=getRoomDef(room);const effMpb=getEffectiveMaxPerBed(room);
+  if(def.gender&&!isCouple&&def.gender!==gender)return`This is a ${def.gender}-only room`;
+  if(isCouple&&def.gender)return'Couples cannot be assigned to gender-locked rooms';
+  if(isCouple&&room.type.startsWith('hospital'))return'Couples cannot be in hospital rooms';
+  const dates=dateRange(checkIn,checkOut);
+  for(const dt of dates){let bb=getBedroomBookings(roomId,bedroomIdx,dt);
+    if(excludeBookingId)bb=bb.filter(x=>x.id!==excludeBookingId&&(!x.coupleId||x.coupleId!==bookings.find(b2=>b2.id===excludeBookingId)?.coupleId));
+    const need=isCouple?2:1;
+    if(bb.length+need>effMpb)return`Bed ${bedroomIdx+1} full on ${dt}`;
+    if(!isCouple&&bb.some(b=>b.gender!==gender&&!b.isCouple))return`Gender conflict in bed ${bedroomIdx+1} on ${dt}`;
+    if(isCouple&&bb.length>0)return`Bed ${bedroomIdx+1} occupied on ${dt}`;
+    if(!isCouple&&bb.some(b=>b.isCouple))return`Bed ${bedroomIdx+1} has a couple on ${dt}`;}
+  return null;
+}
+
+// File uploads
+function triggerUpload(type){document.getElementById(type+'File').click();}
+function handleFileSelect(type,e){const file=e.target.files[0];if(!file)return;
+  if(type==='passport'){pendingPassportFile=file;document.getElementById('passportUploadBtn').textContent='✓ '+file.name;document.getElementById('passportUploadBtn').classList.add('has-file');}
+  if(type==='visa'){pendingVisaFile=file;document.getElementById('visaUploadBtn').textContent='✓ '+file.name;document.getElementById('visaUploadBtn').classList.add('has-file');}}
+async function uploadAsset(file){
+  // Store as base64 in localStorage (standalone mode)
+  try{
+    return new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>{
+        const key='wlf7_asset_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
+        try{localStorage.setItem(key,reader.result);resolve({id:key});}
+        catch(e){console.warn('Asset storage full, skipping');resolve(null);}
+      };
+      reader.onerror=()=>resolve(null);
+      reader.readAsDataURL(file);
+    });
+  }catch(e){return null;}
+}
+
+// Booking
+async function allocateGuest(){
+  const name=document.getElementById('guestName').value.trim();
+  const gender=document.querySelector('input[name="gender"]:checked').value;
+  const isCouple=document.querySelector('input[name="bookingType"]:checked').value==='couple';
+  const partnerName=isCouple?document.getElementById('partnerName').value.trim():'';
+  const checkIn=document.getElementById('checkIn').value;const checkOut=document.getElementById('checkOut').value;
+  const category=document.getElementById('roomCategory').value;const assignRoom=document.getElementById('assignRoom').value;
+  const adminOverride=document.getElementById('adminOverride').checked;const nationality=document.getElementById('nationality').value;
+  clearMsg();
+  if(!name)return showMsg('Enter a guest name.','error');
+  if(isCouple&&!partnerName)return showMsg("Enter partner's name.",'error');
+  if(!checkIn||!checkOut)return showMsg('Select check-in and check-out dates.','error');
+  if(checkIn>=checkOut)return showMsg('Check-out must be after check-in.','error');
+  let aadhaar='',passport='',visa='',passportAssetId=null,visaAssetId=null;
+  if(!adminOverride){
+    if(nationality==='Indian'){aadhaar=document.getElementById('aadhaarNum').value.trim().replace(/\s/g,'');if(!aadhaar||aadhaar.length!==12||!/^\d{12}$/.test(aadhaar))return showMsg('Enter a valid 12-digit Aadhaar number.','error');}
+    else{passport=document.getElementById('passportNum').value.trim();visa=document.getElementById('visaNum').value.trim();if(!passport)return showMsg('Enter a passport number.','error');if(!visa)return showMsg('Enter a visa number.','error');}}
+  if(category==='hostel-f'&&gender!=='female'&&!isCouple)return showMsg('Female hostel is for female guests only.','error');
+  if((category==='hostel-m1'||category==='hostel-m2')&&gender!=='male'&&!isCouple)return showMsg('Male hostel is for male guests only.','error');
+  if(isCouple&&(category.startsWith('hostel')||category.startsWith('hospital')))return showMsg('Couples cannot be booked into hostel or hospital rooms.','error');
+  if(category==='hospital-f'&&gender!=='female')return showMsg('Female hospital block is for females only.','error');
+  if(category==='hospital-m'&&gender!=='male')return showMsg('Male hospital block is for males only.','error');
+  // Upload documents if present
+  if(!adminOverride&&nationality!=='Indian'){
+    if(pendingPassportFile){const r=await uploadAsset(pendingPassportFile);if(r)passportAssetId=r.id;}
+    if(pendingVisaFile){const r=await uploadAsset(pendingVisaFile);if(r)visaAssetId=r.id;}}
+  let roomId,bedroomIdx;
+  if(assignRoom){[roomId,bedroomIdx]=[assignRoom.split('|')[0],parseInt(assignRoom.split('|')[1])];const err=validateManualAssign(roomId,bedroomIdx,gender,isCouple,checkIn,checkOut);if(err)return showMsg(err,'error');}
+  else{const r=findBestRoom(gender,isCouple,checkIn,checkOut,category);if(!r)return showMsg('No suitable room available for these dates/category.','error');roomId=r.room.id;bedroomIdx=r.bedroom;}
+  const room=rooms.find(r=>r.id===roomId);const gd={nationality,aadhaar,passport,visa,passportAssetId,visaAssetId};
+  if(isCouple){const cid=`c-${nextBookingId}`;
+    bookings.push({id:nextBookingId++,guestName:name,gender,isCouple:true,coupleId:cid,roomId,bedroomIdx,checkIn,checkOut,...gd});
+    bookings.push({id:nextBookingId++,guestName:partnerName,gender:gender==='male'?'female':'male',isCouple:true,coupleId:cid,roomId,bedroomIdx,checkIn,checkOut,nationality,aadhaar:'',passport:'',visa:'',passportAssetId:null,visaAssetId:null});
+    showMsg(`✓ ${name} & ${partnerName} → ${room.name}, Bed ${bedroomIdx+1}`,'success');
+    logEdit('add',`Couple: ${name} & ${partnerName} → ${room.name}, Bed ${bedroomIdx+1}`);
+  }else{bookings.push({id:nextBookingId++,guestName:name,gender,isCouple:false,coupleId:null,roomId,bedroomIdx,checkIn,checkOut,...gd});
+    showMsg(`✓ ${name} → ${room.name}, Bed ${bedroomIdx+1}`,'success');logEdit('add',`${name} → ${room.name}, Bed ${bedroomIdx+1}`);}
+  render();
+  saveDataNow().then(ok=>{if(ok)showSaveToast('✅ '+name+' allocated');else showSaveToast('⚠️ Save may have failed');}).catch(()=>showSaveToast('⚠️ Save error'));
+  // Reset form
+  document.getElementById('guestName').value='';document.getElementById('partnerName').value='';
+  document.getElementById('aadhaarNum').value='';document.getElementById('passportNum').value='';document.getElementById('visaNum').value='';
+  pendingPassportFile=null;pendingVisaFile=null;
+  document.getElementById('passportUploadBtn').textContent='📄 Upload passport';document.getElementById('passportUploadBtn').classList.remove('has-file');
+  document.getElementById('visaUploadBtn').textContent='📄 Upload visa stamp';document.getElementById('visaUploadBtn').classList.remove('has-file');
+}
+function removeBooking(id){const b=bookings.find(x=>x.id===id);if(!b)return;const nm=b.guestName;const rm=rooms.find(r=>r.id===b.roomId);
+  showConfirmModal(`Remove ${nm} from ${rm?rm.name:'?'}?`,()=>{
+    if(b.coupleId)bookings=bookings.filter(x=>x.coupleId!==b.coupleId);else bookings=bookings.filter(x=>x.id!==id);
+    logEdit('delete',`Removed ${nm} from ${rm?rm.name:'?'}`);
+    render();
+    saveDataNow().then(ok=>{if(ok)showSaveToast('Removed: '+nm);else showSaveToast('⚠️ Save may have failed');}).catch(()=>showSaveToast('⚠️ Save error'));
+  });
+}
+
+// Manual assignment
+function toggleManual(){const b=document.getElementById('manualBody');const a=document.getElementById('manualArrow');b.classList.toggle('show');a.classList.toggle('open');if(b.classList.contains('show'))populateManualDropdowns();}
+function populateManualDropdowns(){
+  const bSearch=(document.getElementById('manualBookingSearch')?.value||'').toLowerCase().trim();
+  const sel=document.getElementById('manualBooking');const curB=sel.value;sel.innerHTML='<option value="">— select a guest —</option>';
+  const today=dateStr(new Date());
+  for(const b of bookings){if(b.checkOut<=today)continue;if(bSearch&&!b.guestName.toLowerCase().includes(bSearch))continue;const room=rooms.find(r=>r.id===b.roomId);sel.innerHTML+=`<option value="${b.id}">${b.guestName} (${room?room.name:'?'}, Bed ${b.bedroomIdx+1})</option>`;}
+  sel.value=curB;
+  const rSearch=(document.getElementById('manualRoomSearch')?.value||'').toLowerCase().trim();
+  const rsel=document.getElementById('manualRoom');const curR=rsel.value;rsel.innerHTML='<option value="">— select room —</option>';
+  for(const r of rooms){if(rSearch&&!r.name.toLowerCase().includes(rSearch))continue;const def=ROOM_TYPES[r.type];rsel.innerHTML+=`<option value="${r.id}">${r.name} (${def?def.label:r.type})</option>`;}
+  rsel.value=curR;
+}
+function filterManualBooking(){populateManualDropdowns();}
+function filterManualRoom(){populateManualDropdowns();}
+function manualAssign(){
+  const bid=document.getElementById('manualBooking').value;const rid=document.getElementById('manualRoom').value;const bedIdx=parseInt(document.getElementById('manualBed').value);
+  const el=document.getElementById('manualMsg');el.innerHTML='';
+  if(!bid)return el.innerHTML='<span class="error">Select a guest.</span>';
+  if(!rid)return el.innerHTML='<span class="error">Select a target room.</span>';
+  const b=bookings.find(x=>x.id===parseInt(bid));if(!b)return el.innerHTML='<span class="error">Booking not found.</span>';
+  const err=validateManualAssign(rid,bedIdx,b.gender,b.isCouple,b.checkIn,b.checkOut,b.id);
+  if(err){
+    // Show override modal instead of blocking
+    const room=rooms.find(r=>r.id===rid);
+    showOverrideModal(err,b.guestName,room?room.name:'?',()=>{
+      executeMove(parseInt(bid),rid,bedIdx,true);
+      el.innerHTML=`<span class="success">✓ ${b.guestName} moved to ${room?room.name:'?'}, Bed ${bedIdx+1} (override)</span>`;
+    });
+    return;
+  }
+  executeMove(parseInt(bid),rid,bedIdx,false);
+  const room=rooms.find(r=>r.id===rid);
+  el.innerHTML=`<span class="success">✓ ${b.guestName} moved to ${room?room.name:'?'}, Bed ${bedIdx+1}</span>`;
+}
+
+// Room management
+function addRooms(){
+  const type=document.getElementById('addRoomType').value;const baseName=document.getElementById('addRoomName').value.trim();
+  const count=parseInt(document.getElementById('addRoomCount').value)||1;const el=document.getElementById('manageMsg');el.innerHTML='';
+  if(!baseName)return el.innerHTML='<span class="error">Enter a room name/number.</span>';
+  if(count<1||count>200)return el.innerHTML='<span class="error">Count must be 1–200.</span>';
+  const existingNames=new Set(rooms.map(r=>r.name.toLowerCase()));const added=[];
+  for(let i=0;i<count;i++){const name=count===1?baseName:`${baseName}${String(i+1).padStart(count>99?3:count>9?2:1,'0')}`;
+    if(existingNames.has(name.toLowerCase())){el.innerHTML=`<span class="error">"${name}" already exists.</span>`;return;}
+    existingNames.add(name.toLowerCase());rooms.push({id:`r-${nextRoomId++}`,name,type});added.push(name);}
+  logEdit('add',`Added ${added.length} room(s): ${added.slice(0,5).join(', ')}${added.length>5?'…':''}`);
+  render();renderManage();
+  saveDataNow().then(ok=>{if(ok)showSaveToast('✅ Added '+added.length+' room(s)');else showSaveToast('⚠️ Save may have failed');}).catch(()=>showSaveToast('⚠️ Save error'));
+  el.innerHTML=`<span class="success">✓ Added ${added.length} room${added.length>1?'s':''}: ${added.slice(0,5).join(', ')}${added.length>5?'…':''}</span>`;
+  document.getElementById('addRoomName').value='';document.getElementById('addRoomCount').value='1';
+}
+// Custom confirm modal (replaces confirm() which is blocked in iframes)
+function showConfirmModal(msg,onConfirm){
+  let modal=document.getElementById('confirmModal');
+  if(!modal){
+    modal=document.createElement('div');modal.id='confirmModal';
+    modal.innerHTML=`<div class="override-modal-backdrop"></div><div class="override-modal-box"><div class="override-modal-title">Confirm</div><div class="override-modal-body" id="confirmModalBody"></div><div class="override-modal-actions"><button class="btn" id="confirmCancel">Cancel</button><button class="btn btn-danger" id="confirmOk">Confirm</button></div></div>`;
+    document.body.appendChild(modal);
+  }
+  document.getElementById('confirmModalBody').innerHTML=`<p>${msg.replace(/\n/g,'<br>')}</p>`;
+  modal.style.display='flex';
+  const cancel=document.getElementById('confirmCancel');
+  const ok=document.getElementById('confirmOk');
+  function cleanup(){modal.style.display='none';cancel.onclick=null;ok.onclick=null;}
+  cancel.onclick=cleanup;
+  document.querySelector('#confirmModal .override-modal-backdrop').onclick=cleanup;
+  ok.onclick=()=>{cleanup();onConfirm();};
+}
+function deleteRoom(id){const room=rooms.find(r=>r.id===id);if(!room)return;const has=bookings.some(b=>b.roomId===id);
+  if(has){showConfirmModal(`${room.name} has bookings. Delete room and all its bookings?`,()=>{bookings=bookings.filter(b=>b.roomId!==id);logEdit('delete',`Deleted room: ${room.name} (${ROOM_TYPES[room.type]?.label||room.type})`);rooms=rooms.filter(r=>r.id!==id);selectedRoomIds.delete(id);render();renderManage();saveDataNow().then(ok=>{if(ok)showSaveToast('Deleted: '+room.name);else showSaveToast('⚠️ Save may have failed');});});return;}
+  logEdit('delete',`Deleted room: ${room.name} (${ROOM_TYPES[room.type]?.label||room.type})`);
+  rooms=rooms.filter(r=>r.id!==id);selectedRoomIds.delete(id);render();renderManage();
+  saveDataNow().then(ok=>{if(ok)showSaveToast('Deleted: '+room.name);else showSaveToast('⚠️ Save may have failed');});}
+
+// Bulk delete
+function toggleRoomSelect(id){if(selectedRoomIds.has(id))selectedRoomIds.delete(id);else selectedRoomIds.add(id);updateBulkBar();renderManageRoomList();}
+function toggleSelectAll(){
+  const filtered=getFilteredManageRooms();const allSelected=filtered.every(r=>selectedRoomIds.has(r.id));
+  if(allSelected)filtered.forEach(r=>selectedRoomIds.delete(r.id));
+  else filtered.forEach(r=>selectedRoomIds.add(r.id));
+  updateBulkBar();renderManageRoomList();}
+function clearSelection(){selectedRoomIds.clear();updateBulkBar();renderManageRoomList();}
+function updateBulkBar(){const bar=document.getElementById('bulkDeleteBar');const cnt=document.getElementById('bulkDeleteCount');
+  if(selectedRoomIds.size>0){bar.style.display='flex';cnt.textContent=`${selectedRoomIds.size} selected`;}else{bar.style.display='none';}}
+function bulkDeleteRooms(){
+  if(!selectedRoomIds.size)return;
+  const hasBookings=Array.from(selectedRoomIds).some(id=>bookings.some(b=>b.roomId===id));
+  const msg=hasBookings?`Delete ${selectedRoomIds.size} room(s)? Some have bookings — those bookings will also be removed.`:`Delete ${selectedRoomIds.size} room(s)?`;
+  showConfirmModal(msg,()=>{
+    const ids=new Set(selectedRoomIds);const names=rooms.filter(r=>ids.has(r.id)).map(r=>r.name);
+    logEdit('delete',`Bulk deleted ${ids.size} room(s): ${names.slice(0,5).join(', ')}${names.length>5?'…':''}`);
+    bookings=bookings.filter(b=>!ids.has(b.roomId));rooms=rooms.filter(r=>!ids.has(r.id));
+    selectedRoomIds.clear();render();renderManage();
+    saveDataNow().then(ok=>{if(ok)showSaveToast('✅ Deleted '+ids.size+' room(s)');else showSaveToast('⚠️ Save may have failed');});
+  });
+}
+function getFilteredManageRooms(){
+  const search=document.getElementById('roomSearch').value.toLowerCase();const typeFilter=document.getElementById('roomListFilter').value;
+  return rooms.filter(r=>{if(typeFilter!=='all'&&r.type!==typeFilter)return false;if(search&&!r.name.toLowerCase().includes(search))return false;return true;});}
+
+// UI
+function clearMsg(){document.getElementById('msgBar').innerHTML='';}
+function showMsg(msg,type){document.getElementById('msgBar').innerHTML=`<span class="${type}">${msg}</span>`;if(type==='error')setTimeout(clearMsg,6000);}
+function toggleCouple(){document.getElementById('coupleRow').classList.toggle('show',document.querySelector('input[name="bookingType"]:checked').value==='couple');}
+function toggleIdFields(){
+  const admin=document.getElementById('adminOverride').checked;const nat=document.getElementById('nationality').value;const isIndian=nat==='Indian';
+  document.getElementById('aadhaarGroup').style.display=(!admin&&isIndian)?'flex':'none';
+  document.getElementById('passportGroup').style.display=(!admin&&!isIndian)?'flex':'none';
+  document.getElementById('visaGroup').style.display=(!admin&&!isIndian)?'flex':'none';
+  document.getElementById('passportUploadGroup').style.display=(!admin&&!isIndian)?'flex':'none';
+  document.getElementById('visaUploadGroup').style.display=(!admin&&!isIndian)?'flex':'none';
+}
+function updateCategoryHint(){
+  const cat=document.getElementById('roomCategory').value;const gender=document.querySelector('input[name="gender"]:checked').value;
+  if((cat==='hostel-f'||cat==='hospital-f')&&gender==='male')document.getElementById('gFemale').checked=true;
+  if((cat==='hostel-m1'||cat==='hostel-m2'||cat==='hospital-m')&&gender==='female')document.getElementById('gMale').checked=true;
+  renderRoomDropdown();
+}
+
+// Views
+function switchView(v){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===v));document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id===`view-${v}`));if(v==='dashboard')renderDashboard();if(v==='calendar')renderCalendar();if(v==='bookings')renderAllBookings();if(v==='manage')renderManage();if(v==='editlog')renderEditLog();if(v==='backups')renderBackups();if(v==='formc'){renderFormC();renderFormCHistory();}}
+function render(){const date=document.getElementById('viewDate').value;const filter=document.getElementById('filterType').value;renderRoomGrid(date,filter);renderStats(date);renderRoomDropdown();
+  if(document.getElementById('view-dashboard').classList.contains('active'))renderDashboard();
+  if(document.getElementById('view-calendar').classList.contains('active'))renderCalendar();
+  if(document.getElementById('view-bookings').classList.contains('active'))renderAllBookings();
+  if(document.getElementById('view-manage').classList.contains('active'))renderManage();}
+function renderStats(date){let empty=0,partial=0,full=0,guests=0;for(const room of rooms){const o=getRoomOccupancy(room.id,date);guests+=o.current;if(o.current===0)empty++;else if(o.current>=o.max)full++;else partial++;}
+  document.getElementById('headerStats').innerHTML=`<span class="stat-badge">${rooms.length} Rooms</span><span class="stat-badge">${empty} Empty</span><span class="stat-badge">${partial} Partial</span><span class="stat-badge">${full} Full</span><span class="stat-badge">${guests} Guests</span>`;}
+function renderRoomGrid(date,filter){
+  const panel=document.getElementById('roomsPanel');const groups={};for(const k of Object.keys(ROOM_TYPES))groups[k]=[];
+  const srch=(document.getElementById('roomSearch2')?.value||'').toLowerCase().trim();
+  for(const room of rooms){const occ=getRoomOccupancy(room.id,date);const status=occ.current===0?'available':occ.current>=occ.max?'full':'partial';
+    if(filter!=='all'){if(filter==='available'&&status!=='available')continue;if(filter==='partial'&&status!=='partial')continue;if(filter==='full'&&status!=='full')continue;
+      if(!['all','available','partial','full'].includes(filter)&&room.type!==filter)continue;}
+    if(srch){const roomMatch=room.name.toLowerCase().includes(srch);const guestMatch=getRoomBookings(room.id,date).some(b=>b.guestName.toLowerCase().includes(srch));const futureMatch=getFutureRoomBookings(room.id,date).some(b=>b.guestName.toLowerCase().includes(srch));if(!roomMatch&&!guestMatch&&!futureMatch)continue;}
+    if(!groups[room.type])groups[room.type]=[];groups[room.type].push({room,occ,status});}
+  const sortMode=document.getElementById('roomSort')?.value||'default';
+  for(const k of Object.keys(groups)){groups[k].sort((a,b)=>{
+    switch(sortMode){case 'name-asc':return a.room.name.localeCompare(b.room.name,undefined,{numeric:true});case 'name-desc':return b.room.name.localeCompare(a.room.name,undefined,{numeric:true});case 'occupancy-asc':return(a.occ.current/Math.max(a.occ.max,1))-(b.occ.current/Math.max(b.occ.max,1));case 'occupancy-desc':return(b.occ.current/Math.max(b.occ.max,1))-(a.occ.current/Math.max(a.occ.max,1));default:return 0;}});}
+  let html='';
+  for(const[type,def]of Object.entries(ROOM_TYPES)){const items=groups[type]||[];if(!items.length)continue;
+    html+=`<div class="room-section"><h3>${def.label} (${items.length})</h3><div class="room-grid">`;
+    for(const{room,occ,status}of items){const pct=occ.max>0?(occ.current/occ.max*100):0;const cls=status==='available'?'empty':status==='full'?'full':'partial';
+      html+=`<div class="room-card"><div class="room-card-header"><span class="room-name">${room.name}</span><span class="room-type-badge ${def.badge}">${def.label}</span></div><div class="occupancy-bar"><div class="occupancy-fill ${cls}" style="width:${pct}%"></div></div>`;
+      const effMpb=getEffectiveMaxPerBed(room);
+      for(let bed=0;bed<def.beds;bed++){const bb=getBedroomBookings(room.id,bed,date);
+        html+=`<div class="bedroom" data-room="${room.id}" data-bed="${bed}" onclick="onBedClick(event)" ondragover="onBedDragOver(event)" ondragleave="onBedDragLeave(event)" ondrop="onBedDrop(event)"><div class="bedroom-label">Bed ${bed+1} · ${bb.length}/${effMpb}${room.maxOverride?' ⚠':''}</div><div class="guest-tags">`;
+        if(!bb.length)html+=`<span class="empty-slot">Empty</span>`;
+        else for(const b of bb){const c=b.isCouple?'couple':b.gender;const ic=b.isCouple?'♥':(b.gender==='male'?'♂':'♀');const selCls=clickMoveBookingId===b.id?' selected-for-move':'';html+=`<span class="guest-tag ${c}${selCls}" data-bid="${b.id}" draggable="true" ondragstart="onGuestDragStart(event)" ondragend="onGuestDragEnd(event)" onclick="event.stopPropagation();onGuestClick(${b.id},event)">${ic} ${b.guestName}<span class="rx" onclick="event.stopPropagation();removeBooking(${b.id})">×</span></span>`;}
+        // Show future/upcoming bookings for this bed
+        const fb=getFutureBedroomBookings(room.id,bed,date);
+        if(fb.length){html+=`<div class="upcoming-label">Upcoming</div>`;
+          for(const b of fb){const c=b.isCouple?'couple':b.gender;const ic=b.isCouple?'♥':(b.gender==='male'?'♂':'♀');const selCls=clickMoveBookingId===b.id?' selected-for-move':'';html+=`<span class="guest-tag ${c} upcoming${selCls}" data-bid="${b.id}" draggable="true" ondragstart="onGuestDragStart(event)" ondragend="onGuestDragEnd(event)" onclick="event.stopPropagation();onGuestClick(${b.id},event)">${ic} ${b.guestName} <span style="font-size:8px;opacity:.7">${b.checkIn}</span><span class="rx" onclick="event.stopPropagation();removeBooking(${b.id})">×</span></span>`;}}
+        html+=`</div></div>`;}html+=`</div>`;}html+=`</div></div>`;}
+  if(!html)html='<p style="text-align:center;color:var(--text-light);padding:40px">No rooms match filter.</p>';panel.innerHTML=html;
+}
+function renderRoomDropdown(){
+  const sel=document.getElementById('assignRoom');const cur=sel.value;const ci=document.getElementById('checkIn').value||document.getElementById('viewDate').value;const cat=document.getElementById('roomCategory').value;
+  const srch=(document.getElementById('assignRoomSearch')?.value||'').toLowerCase().trim();
+  sel.innerHTML='<option value="">Auto-assign</option>';
+  for(const room of rooms){if(cat&&cat!=='auto'&&room.type!==cat)continue;if(srch&&!room.name.toLowerCase().includes(srch))continue;const def=getRoomDef(room);const effMpb=getEffectiveMaxPerBed(room);
+    for(let bed=0;bed<def.beds;bed++){const bb=getBedroomBookings(room.id,bed,ci);const spots=effMpb-bb.length;if(spots<=0)continue;
+      const o=document.createElement('option');o.value=`${room.id}|${bed}`;o.textContent=`${room.name} · Bed ${bed+1} (${spots} spot${spots>1?'s':''})`;sel.appendChild(o);}}sel.value=cur;
+}
+function filterAssignRoom(){renderRoomDropdown();}
+
+// Guest detail modal
+function showGuestDetail(id){
+  const b=bookings.find(x=>x.id===id);if(!b)return;const room=rooms.find(r=>r.id===b.roomId);
+  document.getElementById('modalTitle').textContent=b.guestName;
+  let html='';
+  html+=`<div class="detail-row"><span class="detail-label">Gender</span><span class="detail-value">${b.gender==='male'?'♂ Male':'♀ Female'}${b.isCouple?' (Couple)':''}</span></div>`;
+  html+=`<div class="detail-row"><span class="detail-label">Room</span><span class="detail-value">${room?room.name:'—'} · Bed ${b.bedroomIdx+1}</span></div>`;
+  html+=`<div class="detail-row"><span class="detail-label">Check-in</span><span class="detail-value">${b.checkIn}</span></div>`;
+  html+=`<div class="detail-row"><span class="detail-label">Check-out</span><span class="detail-value">${b.checkOut}</span></div>`;
+  html+=`<div class="detail-row"><span class="detail-label">Nationality</span><span class="detail-value">${b.nationality||'Indian'}</span></div>`;
+  if(b.aadhaar)html+=`<div class="detail-row"><span class="detail-label">Aadhaar</span><span class="detail-value">${b.aadhaar.replace(/(\d{4})/g,'$1 ').trim()}</span></div>`;
+  if(b.passport)html+=`<div class="detail-row"><span class="detail-label">Passport</span><span class="detail-value">${b.passport}</span></div>`;
+  if(b.visa)html+=`<div class="detail-row"><span class="detail-label">Visa No.</span><span class="detail-value">${b.visa}</span></div>`;
+  if(b.passportAssetId){const pSrc=localStorage.getItem(b.passportAssetId)||('/_blob/'+b.passportAssetId);html+=`<div class="doc-preview"><div class="doc-preview-label">Passport Scan</div><img src="${pSrc}" alt="Passport"></div>`;}
+  if(b.visaAssetId){const vSrc=localStorage.getItem(b.visaAssetId)||('/_blob/'+b.visaAssetId);html+=`<div class="doc-preview"><div class="doc-preview-label">Visa Stamp</div><img src="${vSrc}" alt="Visa"></div>`;}
+  if(b.coupleId){const partner=bookings.find(x=>x.coupleId===b.coupleId&&x.id!==b.id);if(partner)html+=`<div class="detail-row"><span class="detail-label">Partner</span><span class="detail-value" style="cursor:pointer;color:var(--primary)" onclick="closeModal();setTimeout(()=>showGuestDetail(${partner.id}),200)">${partner.guestName}</span></div>`;}
+  html+=`<div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-accent" onclick="closeModal();editGuest(${b.id})">✏ Edit Guest</button><button class="btn btn-danger" onclick="closeModal();removeBooking(${b.id})">🗑 Remove</button></div>`;
+  document.getElementById('modalBody').innerHTML=html;document.getElementById('guestModal').classList.add('show');
+}
+function closeModal(){document.getElementById('guestModal').classList.remove('show');}
+
+// All bookings
+function renderAllBookings(){
+  const filter=document.getElementById('bookingsFilter').value;const today=dateStr(new Date());const shown=new Set();const rows=[];
+  const genderFilter=document.getElementById('bookingsGender')?.value||'all';
+  const typeFilter=document.getElementById('bookingsType')?.value||'all';
+  const search=(document.getElementById('bookingsSearch')?.value||'').toLowerCase();
+  for(const b of bookings){if(b.coupleId&&shown.has(b.coupleId))continue;if(b.coupleId)shown.add(b.coupleId);
+    if(filter==='current'&&!(b.checkIn<=today&&b.checkOut>today))continue;
+    if(filter==='upcoming'&&!(b.checkIn>today))continue;
+    if(filter==='past'&&!(b.checkOut<=today))continue;
+    if(genderFilter!=='all'&&b.gender!==genderFilter)continue;
+    if(typeFilter!=='all'){const room=rooms.find(r=>r.id===b.roomId);if(!room||room.type!==typeFilter)continue;}
+    if(search&&!b.guestName.toLowerCase().includes(search)){const partner=b.coupleId?bookings.find(x=>x.coupleId===b.coupleId&&x.id!==b.id):null;if(!partner||!partner.guestName.toLowerCase().includes(search))continue;}
+    rows.push(b);}
+  const sortVal=document.getElementById('bookingsSort')?.value||'checkin-asc';
+  rows.sort((a,b)=>{
+    const ra=rooms.find(r=>r.id===a.roomId),rb=rooms.find(r=>r.id===b.roomId);
+    switch(sortVal){
+      case 'name-asc':return a.guestName.localeCompare(b.guestName);
+      case 'name-desc':return b.guestName.localeCompare(a.guestName);
+      case 'checkin-asc':return a.checkIn<b.checkIn?-1:a.checkIn>b.checkIn?1:0;
+      case 'checkin-desc':return b.checkIn<a.checkIn?-1:b.checkIn>a.checkIn?1:0;
+      case 'room-asc':return(ra?.name||'').localeCompare(rb?.name||'');
+      case 'room-desc':return(rb?.name||'').localeCompare(ra?.name||'');
+      case 'gender':return a.gender.localeCompare(b.gender)||a.guestName.localeCompare(b.guestName);
+      case 'type':return(ra?.type||'').localeCompare(rb?.type||'')||(ra?.name||'').localeCompare(rb?.name||'');
+      default:return 0;}});
+  document.getElementById('bookingsCount').textContent=`${rows.length} booking${rows.length!==1?'s':''}`;
+  if(!rows.length){document.getElementById('allBookingsList').innerHTML='<div class="no-bookings">No bookings found</div>';return;}
+  let html='';
+  for(const b of rows){const room=rooms.find(r=>r.id===b.roomId);const partner=b.coupleId?bookings.find(x=>x.coupleId===b.coupleId&&x.id!==b.id):null;const isActive=b.checkIn<=today&&b.checkOut>today;const isPast=b.checkOut<=today;
+    const gIcon=b.gender==='male'?'♂':'♀';const gClr=b.gender==='male'?'var(--male)':'var(--female)';
+    const idInfo=b.aadhaar?`Aadhaar: …${b.aadhaar.slice(-4)}`:(b.passport?`Passport: ${b.passport}`:'');
+    html+=`<div class="booking-item" style="${isPast?'opacity:.5':''}"><div style="cursor:pointer;flex:1" onclick="showGuestDetail(${b.id})"><div class="booking-name"><span style="color:${gClr}">${gIcon}</span> ${b.guestName}${partner?' & '+partner.guestName:''}</div><div class="booking-detail">${room?room.name:'?'} <span class="room-type-badge ${getRoomDef(room||{type:'standard'}).badge}" style="font-size:7px;vertical-align:middle">${room?ROOM_TYPES[room.type]?.label:''}</span> · Bed ${b.bedroomIdx+1} · ${b.checkIn} → ${b.checkOut}${isActive?' · <strong style="color:var(--success)">Active</strong>':''}</div>${idInfo?`<div class="booking-id-info">${idInfo} · ${b.nationality||'Indian'}</div>`:''}</div><div style="display:flex;gap:4px;align-items:center"><button class="btn btn-accent btn-sm" onclick="editGuest(${b.id})">Edit</button><button class="btn btn-danger btn-sm" onclick="removeBooking(${b.id})">Remove</button></div></div>`;}
+  document.getElementById('allBookingsList').innerHTML=html;
+}
+
+// Dashboard
+function renderDashboard(){
+  const today=dateStr(new Date());const container=document.getElementById('dashContent');
+  /* Compute stats */
+  const active=getActiveBookings(today);const totalGuests=active.length;
+  const totalBeds=rooms.reduce((s,r)=>s+getEffectiveMax(r),0);
+  let emptyR=0,partialR=0,fullR=0;
+  for(const room of rooms){const o=getRoomOccupancy(room.id,today);if(o.current===0)emptyR++;else if(o.current>=o.max)fullR++;else partialR++;}
+  const occPct=totalBeds>0?Math.round(totalGuests/totalBeds*100):0;
+  /* Arrivals & departures today */
+  const arrivalsToday=bookings.filter(b=>b.checkIn===today);
+  const departuresToday=bookings.filter(b=>b.checkOut===today);
+  /* Upcoming 3 days */
+  const upcoming=[];for(let i=1;i<=3;i++){const d=new Date();d.setDate(d.getDate()+i);const ds=dateStr(d);const arr=bookings.filter(b=>b.checkIn===ds);if(arr.length)upcoming.push({date:ds,guests:arr});}
+  /* Gender */
+  const males=active.filter(b=>b.gender==='male').length;const females=active.filter(b=>b.gender==='female').length;
+  /* Nationality */
+  const intl=active.filter(b=>b.nationality==='Other').length;const indian=active.length-intl;
+  /* Occupancy by room type */
+  const typeStats={};for(const[type,def]of Object.entries(ROOM_TYPES)){
+    const rms=rooms.filter(r=>r.type===type);const cap=rms.reduce((s,r)=>s+getEffectiveMax(r),0);
+    let occ=0;for(const r of rms){occ+=getRoomOccupancy(r.id,today).current;}
+    typeStats[type]={label:def.label,occ,cap,pct:cap>0?Math.round(occ/cap*100):0};}
+  /* Daily trend (event range: earliest checkIn to latest checkOut) */
+  let minD=null,maxD=null;
+  for(const b of bookings){if(b.checkIn&&(!minD||b.checkIn<minD))minD=b.checkIn;if(b.checkOut&&(!maxD||b.checkOut>maxD))maxD=b.checkOut;}
+  const trendDays=[];if(minD&&maxD){const c=new Date(minD+'T00:00:00');const e=new Date(maxD+'T00:00:00');while(c<=e){trendDays.push(dateStr(c));c.setDate(c.getDate()+1);}}
+  const trendData=trendDays.map(d=>({date:d,count:getActiveBookings(d).length}));
+  const maxTrend=Math.max(1,...trendData.map(t=>t.count));
+  /* Rooms at capacity */
+  const fullRooms=rooms.filter(r=>{const o=getRoomOccupancy(r.id,today);return o.current>=o.max&&o.current>0;});
+
+  /* BUILD HTML */
+  let html='';
+  /* KPI tiles */
+  html+=`<div class="dash-kpis">
+    <div class="kpi highlight"><div class="kpi-val">${occPct}%</div><div class="kpi-label">Occupancy</div></div>
+    <div class="kpi"><div class="kpi-val">${totalGuests}</div><div class="kpi-label">Guests Today</div></div>
+    <div class="kpi"><div class="kpi-val">${totalBeds}</div><div class="kpi-label">Total Beds</div></div>
+    <div class="kpi"><div class="kpi-val">${rooms.length}</div><div class="kpi-label">Total Rooms</div></div>
+    <div class="kpi green"><div class="kpi-val">${arrivalsToday.length}</div><div class="kpi-label">Arrivals Today</div></div>
+    <div class="kpi warn"><div class="kpi-val">${departuresToday.length}</div><div class="kpi-label">Departures Today</div></div>
+    <div class="kpi"><div class="kpi-val">${bookings.length}</div><div class="kpi-label">Total Bookings</div></div>
+    <div class="kpi${fullR>0?' highlight':''}"><div class="kpi-val">${fullR}</div><div class="kpi-label">Rooms Full</div></div>
+  </div>`;
+
+  /* Row: Arrivals + Departures */
+  html+='<div class="dash-row">';
+  html+='<div class="dash-card"><h3>🛬 Arrivals Today ('+arrivalsToday.length+')</h3><div class="dash-list">';
+  if(arrivalsToday.length===0)html+='<div style="color:var(--text-muted);font-size:11px">No arrivals today</div>';
+  for(const b of arrivalsToday){const room=rooms.find(r=>r.id===b.roomId);html+=`<div class="dash-list-item"><span>${b.gender==='male'?'♂':'♀'} ${b.guestName}</span><span style="color:var(--text-muted)">${room?room.name:'Unassigned'}</span></div>`;}
+  html+='</div></div>';
+  html+='<div class="dash-card"><h3>🛫 Departures Today ('+departuresToday.length+')</h3><div class="dash-list">';
+  if(departuresToday.length===0)html+='<div style="color:var(--text-muted);font-size:11px">No departures today</div>';
+  for(const b of departuresToday){const room=rooms.find(r=>r.id===b.roomId);html+=`<div class="dash-list-item"><span>${b.gender==='male'?'♂':'♀'} ${b.guestName}</span><span style="color:var(--text-muted)">${room?room.name:'Unassigned'}</span></div>`;}
+  html+='</div></div></div>';
+
+  /* Row: Occupancy by type + Gender/Nationality */
+  html+='<div class="dash-row">';
+  html+='<div class="dash-card"><h3>🏨 Occupancy by Room Type</h3>';
+  for(const[type,st] of Object.entries(typeStats)){
+    const color=st.pct>=90?'var(--danger)':st.pct>=60?'var(--warning)':'var(--success)';
+    html+=`<div class="dash-bar-row"><span class="dash-bar-label">${st.label}</span><div class="dash-bar-track"><div class="dash-bar-fill" style="width:${st.pct}%;background:${color}"></div></div><span class="dash-bar-pct">${st.occ}/${st.cap}</span></div>`;}
+  html+='</div>';
+
+  html+='<div class="dash-card"><h3>👥 Guest Breakdown</h3>';
+  html+='<div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px">';
+  /* Gender donut via simple bars */
+  const gTotal=males+females||1;
+  html+=`<div style="flex:1;min-width:120px"><div style="font-size:10px;font-weight:700;color:var(--text-muted);margin-bottom:6px">GENDER</div>`;
+  html+=`<div class="dash-bar-row"><span class="dash-bar-label" style="min-width:60px">♂ Male</span><div class="dash-bar-track"><div class="dash-bar-fill" style="width:${Math.round(males/gTotal*100)}%;background:var(--male)"></div></div><span class="dash-bar-pct">${males}</span></div>`;
+  html+=`<div class="dash-bar-row"><span class="dash-bar-label" style="min-width:60px">♀ Female</span><div class="dash-bar-track"><div class="dash-bar-fill" style="width:${Math.round(females/gTotal*100)}%;background:var(--female)"></div></div><span class="dash-bar-pct">${females}</span></div></div>`;
+  /* Nationality */
+  const nTotal=indian+intl||1;
+  html+=`<div style="flex:1;min-width:120px"><div style="font-size:10px;font-weight:700;color:var(--text-muted);margin-bottom:6px">NATIONALITY</div>`;
+  html+=`<div class="dash-bar-row"><span class="dash-bar-label" style="min-width:60px">🇮🇳 Indian</span><div class="dash-bar-track"><div class="dash-bar-fill" style="width:${Math.round(indian/nTotal*100)}%;background:var(--accent)"></div></div><span class="dash-bar-pct">${indian}</span></div>`;
+  html+=`<div class="dash-bar-row"><span class="dash-bar-label" style="min-width:60px">🌍 Int'l</span><div class="dash-bar-track"><div class="dash-bar-fill" style="width:${Math.round(intl/nTotal*100)}%;background:var(--primary)"></div></div><span class="dash-bar-pct">${intl}</span></div></div>`;
+  html+='</div></div></div>';
+
+  /* Occupancy trend chart */
+  if(trendData.length>0){
+    html+='<div class="dash-card dash-card-full"><h3>📈 Daily Occupancy Trend ('+trendData.length+' days)</h3>';
+    html+='<div class="dash-mini-chart">';
+    for(const t of trendData){
+      const h=Math.max(4,Math.round(t.count/maxTrend*72));
+      const isToday=t.date===today;
+      const color=isToday?'var(--primary)':t.count>=totalBeds*0.9?'var(--danger)':t.count>=totalBeds*0.6?'var(--warning)':'var(--success)';
+      html+=`<div class="dash-mini-bar" style="height:${h}px;background:${color}${isToday?';outline:2px solid var(--primary);outline-offset:1px':''}" data-tip="${t.date}: ${t.count} guests"></div>`;}
+    html+='</div>';
+    html+='<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-top:2px"><span>'+trendData[0].date+'</span><span>'+trendData[trendData.length-1].date+'</span></div>';
+    html+='</div>';}
+
+  /* Row: Full rooms + Upcoming */
+  html+='<div class="dash-row">';
+  html+='<div class="dash-card"><h3>🚨 Rooms at Capacity ('+fullRooms.length+')</h3>';
+  if(fullRooms.length===0)html+='<div style="color:var(--success);font-size:11px;font-weight:600">All rooms have availability</div>';
+  else{for(const r of fullRooms.slice(0,15)){const o=getRoomOccupancy(r.id,today);html+=`<div class="dash-alert red">${r.name} — ${o.current}/${o.max} beds</div>`;}
+    if(fullRooms.length>15)html+=`<div style="font-size:10px;color:var(--text-muted)">...and ${fullRooms.length-15} more</div>`;}
+  html+='</div>';
+
+  html+='<div class="dash-card"><h3>📅 Upcoming Arrivals (3 days)</h3>';
+  if(upcoming.length===0)html+='<div style="color:var(--text-muted);font-size:11px">No arrivals in the next 3 days</div>';
+  for(const u of upcoming){html+=`<div style="font-size:10px;font-weight:700;color:var(--primary);margin:6px 0 3px">${u.date} (${u.guests.length} guest${u.guests.length>1?'s':''})</div>`;
+    for(const b of u.guests){const room=rooms.find(r=>r.id===b.roomId);html+=`<div class="dash-list-item"><span>${b.gender==='male'?'♂':'♀'} ${b.guestName}</span><span style="color:var(--text-muted)">${room?room.name:'—'}</span></div>`;}}
+  html+='</div></div>';
+
+  container.innerHTML=html;
+}
+
+// Calendar
+const CAL_MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const CAL_DN=['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+function setCalView(mode){
+  calViewMode=mode;
+  document.querySelectorAll('.cal-view-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  renderCalendar();
+}
+function calGoToday(){const t=new Date();calYear=t.getFullYear();calMonth=t.getMonth();calDay=t.getDate();renderCalendar();}
+function navCal(d){
+  if(calViewMode==='day'){const dt=new Date(calYear,calMonth,calDay+d);calYear=dt.getFullYear();calMonth=dt.getMonth();calDay=dt.getDate();}
+  else if(calViewMode==='week'){const dt=new Date(calYear,calMonth,calDay+d*7);calYear=dt.getFullYear();calMonth=dt.getMonth();calDay=dt.getDate();}
+  else if(calViewMode==='month'){calMonth+=d;if(calMonth<0){calMonth=11;calYear--;}if(calMonth>11){calMonth=0;calYear++;}}
+  else if(calViewMode==='full'){calMonth+=d*3;while(calMonth<0){calMonth+=12;calYear--;}while(calMonth>11){calMonth-=12;calYear++;}}
+  renderCalendar();
+}
+function getCalDateRange(){
+  const anchor=new Date(calYear,calMonth,calDay||1);
+  if(calViewMode==='day')return{start:new Date(anchor),end:new Date(anchor)};
+  if(calViewMode==='week'){const dow=anchor.getDay();const s=new Date(anchor);s.setDate(s.getDate()-dow);const e=new Date(s);e.setDate(e.getDate()+6);return{start:s,end:e};}
+  if(calViewMode==='month'){return{start:new Date(calYear,calMonth,1),end:new Date(calYear,calMonth+1,0)};}
+  /* full — show all dates with bookings, Nov–Dec 2024 as default range */
+  let minD=null,maxD=null;
+  for(const b of bookings){if(b.checkIn&&(!minD||b.checkIn<minD))minD=b.checkIn;if(b.checkOut&&(!maxD||b.checkOut>maxD))maxD=b.checkOut;}
+  if(!minD)minD=dateStr(new Date());if(!maxD){const e=new Date();e.setDate(e.getDate()+30);maxD=dateStr(e);}
+  return{start:new Date(minD+'T00:00:00'),end:new Date(maxD+'T00:00:00')};
+}
+function getDateList(start,end){
+  const list=[];const cur=new Date(start);
+  while(cur<=end){list.push(dateStr(cur));cur.setDate(cur.getDate()+1);}
+  return list;
+}
+function onCalSlider(){
+  const slider=document.getElementById('calSlider');
+  const range=getCalDateRange();const dates=getDateList(range.start,range.end);
+  if(!dates.length)return;
+  const wrap=document.querySelector('.calendar-table-wrap');if(!wrap)return;
+  const idx=Math.min(parseInt(slider.value),dates.length-1);
+  /* scroll to that column */
+  const cells=wrap.querySelectorAll(`[data-date="${dates[idx]}"]`);
+  if(cells.length>0){const cell=cells[0];const wrapRect=wrap.getBoundingClientRect();const cellRect=cell.getBoundingClientRect();wrap.scrollLeft+=cellRect.left-wrapRect.left-80;}
+}
+function updateSlider(dates){
+  const slider=document.getElementById('calSlider');const startLbl=document.getElementById('sliderStartLabel');const endLbl=document.getElementById('sliderEndLabel');
+  if(!dates.length){document.getElementById('calSliderRow').style.display='none';return;}
+  document.getElementById('calSliderRow').style.display=(dates.length<=7)?'none':'flex';
+  slider.min=0;slider.max=dates.length-1;slider.value=0;
+  startLbl.textContent=dates[0];endLbl.textContent=dates[dates.length-1];
+}
+function renderCalendar(){
+  const filter=document.getElementById('calFilter').value;
+  const range=getCalDateRange();const dates=getDateList(range.start,range.end);
+  /* Update header label */
+  const lbl=document.getElementById('calMonthLabel');
+  if(calViewMode==='day'){const d=new Date(calYear,calMonth,calDay);lbl.textContent=`${CAL_DN[d.getDay()]} ${calDay} ${CAL_MN[calMonth]} ${calYear}`;}
+  else if(calViewMode==='week'){lbl.textContent=`${dates[0]} — ${dates[dates.length-1]}`;}
+  else if(calViewMode==='month'){lbl.textContent=`${CAL_MN[calMonth]} ${calYear}`;}
+  else{lbl.textContent=`Full View (${dates.length} days)`;}
+  const todayStr=dateStr(new Date());
+  const calSrch=(document.getElementById('calSearch')?.value||'').toLowerCase().trim();
+  let filtered=filter==='all'?rooms:rooms.filter(r=>r.type===filter);
+  if(calSrch)filtered=filtered.filter(r=>r.name.toLowerCase().includes(calSrch));
+  /* Column widths */
+  const roomColW=displayPrefs.calRoomColWidth||90;
+  const defaultDateW=calViewMode==='day'?140:32;
+  const dateColW=displayPrefs.calDateColWidth||defaultDateW;
+  const tableW=roomColW+dates.length*dateColW;
+  /* Build header — widths set on <th> (table-layout:fixed uses first row) */
+  let html=`<thead><tr><th class="cal-resizable" style="width:${roomColW}px">Room<div class="cal-resize-handle" onmousedown="startCalColResize(event,'room')"></div></th>`;
+  for(const ds of dates){const dt=new Date(ds+'T00:00:00');const dow=dt.getDay();const dd=dt.getDate();const mm=dt.getMonth();
+    const isWknd=dow===0||dow===6;const resizer=`<div class="cal-resize-handle" onmousedown="startCalColResize(event,'date')"></div>`;
+    if(calViewMode==='day'){html+=`<th class="cal-resizable" style="width:${dateColW}px"><div style="font-size:9px">${CAL_DN[dow]}</div><div>${dd} ${CAL_MN[mm].slice(0,3)}</div>${resizer}</th>`;}
+    else{const showMonth=(dd===1||ds===dates[0])?`<div style="font-size:7px;color:#ffc">${CAL_MN[mm].slice(0,3)}</div>`:'';
+      html+=`<th class="cal-resizable ${isWknd?'weekend':''}" style="width:${dateColW}px">${showMonth}<div style="font-size:8px">${CAL_DN[dow]}</div><div>${dd}</div>${resizer}</th>`;}}
+  html+='</tr></thead><tbody>';let lastType='';
+  for(const room of filtered){if(room.type!==lastType){lastType=room.type;html+=`<tr class="section-row"><td colspan="${dates.length+1}">${ROOM_TYPES[room.type]?.label||room.type}</td></tr>`;}
+    html+=`<tr><td class="room-label">${room.name}</td>`;
+    for(const ds of dates){const occ=getRoomOccupancy(room.id,ds);const st=occ.current===0?'empty':occ.current>=occ.max?'full':'partial';
+      if(calViewMode==='day'){
+        const guests=getRoomBookings(room.id,ds);let gHtml=occ.current>0?`<span class="cc">${occ.current}/${occ.max}</span> `:'';
+        for(const g of guests){const c=g.isCouple?'var(--couple)':g.gender==='male'?'var(--male)':'var(--female)';gHtml+=`<span style="display:inline-block;padding:1px 5px;border-radius:4px;font-size:9px;background:${c};color:#fff;margin:1px">${g.guestName}</span> `;}
+        html+=`<td class="cal-cell ${st}${ds===todayStr?' today':''}" data-room="${room.id}" data-date="${ds}" style="text-align:left;padding:3px 6px">${gHtml}</td>`;
+      }else{
+        html+=`<td class="cal-cell ${st}${ds===todayStr?' today':''}" data-room="${room.id}" data-date="${ds}" onmouseenter="showTooltip(event)" onmouseleave="hideTooltip()"><span class="cc">${occ.current>0?occ.current:''}</span></td>`;}}
+    html+='</tr>';}html+='</tbody>';
+  const tbl=document.getElementById('calendarTable');tbl.style.width=tableW+'px';tbl.innerHTML=html;
+  updateSlider(dates);
+  /* Auto-scroll to today if visible */
+  if(dates.includes(todayStr)){setTimeout(()=>{const wrap=document.querySelector('.calendar-table-wrap');const cell=wrap?.querySelector(`[data-date="${todayStr}"]`);if(cell&&wrap){const wR=wrap.getBoundingClientRect();const cR=cell.getBoundingClientRect();if(cR.left<wR.left||cR.right>wR.right)wrap.scrollLeft+=cR.left-wR.left-80;}},50);}
+}
+
+// Calendar column resize
+function startCalColResize(e,colType){
+  e.preventDefault();e.stopPropagation();
+  const startX=e.clientX;
+  const tbl=document.getElementById('calendarTable');
+  const ths=tbl.querySelectorAll('thead th');
+  const roomTh=ths[0];
+  const dateThList=[...ths].slice(1);
+  const defaultDateW=calViewMode==='day'?140:32;
+  let curRoomW=displayPrefs.calRoomColWidth||90;
+  let curDateW=displayPrefs.calDateColWidth||defaultDateW;
+  const startW=colType==='room'?curRoomW:curDateW;
+  const minW=colType==='room'?40:16;
+  const maxW=colType==='room'?350:200;
+  document.body.classList.add('cal-resizing');
+  function applyWidths(rw,dw){
+    roomTh.style.width=rw+'px';
+    dateThList.forEach(th=>{th.style.width=dw+'px';});
+    tbl.style.width=(rw+dateThList.length*dw)+'px';
+  }
+  function onMove(ev){
+    ev.preventDefault();
+    const diff=ev.clientX-startX;const newW=Math.max(minW,Math.min(maxW,startW+diff));
+    if(colType==='room')curRoomW=newW; else curDateW=newW;
+    applyWidths(curRoomW,curDateW);
+  }
+  function onUp(){
+    document.body.classList.remove('cal-resizing');
+    if(colType==='room')displayPrefs.calRoomColWidth=curRoomW;
+    else displayPrefs.calDateColWidth=curDateW;
+    saveDisplayPrefs();
+    document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);
+  }
+  document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);
+}
+
+// Tooltip
+const tooltip=document.getElementById('tooltip');
+function showTooltip(e){const cell=e.target.closest('.cal-cell');if(!cell)return;const roomId=cell.dataset.room,date=cell.dataset.date;const room=rooms.find(r=>r.id===roomId);if(!room)return;const occ=getRoomOccupancy(roomId,date);const guests=getRoomBookings(roomId,date);
+  let html=`<div class="tooltip-title">${room.name} — ${date}</div><div>${occ.current}/${occ.max} occupied</div>`;
+  if(guests.length){html+='<div style="margin-top:3px">';for(const g of guests){const color=g.isCouple?'var(--couple)':g.gender==='male'?'var(--male)':'var(--female)';const lbl=g.isCouple?'♥':(g.gender==='male'?'♂':'♀');html+=`<div class="tooltip-guest"><span class="tooltip-dot" style="background:${color}"></span>${lbl} ${g.guestName}</div>`;}html+='</div>';}
+  tooltip.innerHTML=html;tooltip.classList.add('show');const rect=cell.getBoundingClientRect();let left=rect.right+8,top=rect.top;if(left+220>window.innerWidth)left=rect.left-228;if(top+150>window.innerHeight)top=window.innerHeight-160;tooltip.style.left=left+'px';tooltip.style.top=top+'px';}
+function hideTooltip(){tooltip.classList.remove('show');}
+
+// Manage rooms
+function renderManage(){renderInventory();renderManageRoomList();document.getElementById('totalRoomCount').textContent=`(${rooms.length} total)`;}
+function renderInventory(){
+  const inv=document.getElementById('roomInventory');let html='';
+  for(const[type,def]of Object.entries(ROOM_TYPES)){const count=rooms.filter(r=>r.type===type).length;
+    html+=`<div class="rt-item"><div class="rt-info"><div class="rt-name">${def.label}</div><div class="rt-detail">${def.beds} bed${def.beds>1?'s':''} · Max ${def.max}/room · ${def.gender?def.gender+' only':'Mixed/Couple'}</div></div><div class="rt-count">${count}</div></div>`;}
+  inv.innerHTML=html;}
+function renderManageRoomList(){
+  const list=document.getElementById('allRoomsList');const filtered=getFilteredManageRooms();
+  if(!filtered.length){list.innerHTML='<div class="no-bookings">No rooms match filter.</div>';return;}
+  let html='';
+  for(const room of filtered){const def=getRoomDef(room);const bCount=bookings.filter(b=>b.roomId===room.id).length;const sel=selectedRoomIds.has(room.id);
+    const safeId=room.id.replace(/[^a-zA-Z0-9]/g,'_');
+    const effMpb=getEffectiveMaxPerBed(room);const hasOvr=room.maxOverride!=null&&room.maxOverride>0;
+    html+=`<div class="del-room-item" style="${sel?'background:var(--danger-light)':''}">
+      <div style="display:flex;align-items:center;gap:8px;flex:1">
+        <input type="checkbox" ${sel?'checked':''} onchange="toggleRoomSelect('${room.id}')" style="accent-color:var(--primary)">
+        <div style="flex:1"><div class="del-room-name" id="rn-${safeId}">${room.name} <span class="room-type-badge ${def.badge}" style="font-size:8px;vertical-align:middle">${def.label}</span></div>
+        <div class="del-room-detail">${bCount} booking${bCount!==1?'s':''} · Max/bed: ${effMpb}${hasOvr?' (override)':''}</div></div>
+      </div>
+      <div class="del-room-actions"><button class="btn btn-outline btn-sm" onclick="setMaxOverride('${room.id}')" title="Set max per bed">👥</button><button class="btn btn-outline btn-sm" onclick="startEditRoomName('${room.id}')" title="Rename">✏</button><button class="btn btn-danger btn-sm" onclick="deleteRoom('${room.id}')">Delete</button></div></div>`;}
+  list.innerHTML=html;updateBulkBar();
+}
+
+
+// Edit guest
+function editGuest(id){
+  const b=bookings.find(x=>x.id===id);if(!b)return;
+  const room=rooms.find(r=>r.id===b.roomId);
+  document.getElementById('modalTitle').textContent='Edit Guest';
+  let html=`<div class="edit-form">
+    <div class="edit-row">
+      <div class="form-group"><label>Guest Name</label><input type="text" id="editName" value="${(b.guestName||'').replace(/"/g,'&quot;')}"></div>
+      <div class="form-group"><label>Gender</label><select id="editGender"><option value="male"${b.gender==='male'?' selected':''}>♂ Male</option><option value="female"${b.gender==='female'?' selected':''}>♀ Female</option></select></div>
+    </div>
+    <div class="edit-row">
+      <div class="form-group"><label>Check-in</label><input type="date" id="editCheckIn" value="${b.checkIn}"></div>
+      <div class="form-group"><label>Check-out</label><input type="date" id="editCheckOut" value="${b.checkOut}"></div>
+    </div>
+    <div class="edit-row">
+      <div class="form-group"><label>Room</label><input type="text" id="editRoomSearch" placeholder="Search room…" oninput="filterEditRoom()" style="margin-bottom:4px;font-size:11px"><select id="editRoom">${rooms.map(r=>`<option value="${r.id}"${r.id===b.roomId?' selected':''}>${r.name} (${ROOM_TYPES[r.type]?.label||r.type})</option>`).join('')}</select></div>
+      <div class="form-group"><label>Bed</label><select id="editBed"><option value="0"${b.bedroomIdx===0?' selected':''}>Bed 1</option><option value="1"${b.bedroomIdx===1?' selected':''}>Bed 2</option></select></div>
+    </div>
+    <div class="edit-row">
+      <div class="form-group"><label>Nationality</label><select id="editNat"><option value="Indian"${(b.nationality||'Indian')==='Indian'?' selected':''}>Indian</option><option value="Other"${b.nationality==='Other'?' selected':''}>Other</option></select></div>
+      <div class="form-group"><label>Aadhaar</label><input type="text" id="editAadhaar" value="${b.aadhaar||''}" maxlength="14" placeholder="12-digit"></div>
+    </div>
+    <div class="edit-row">
+      <div class="form-group"><label>Passport</label><input type="text" id="editPassport" value="${b.passport||''}" placeholder="Passport no."></div>
+      <div class="form-group"><label>Visa</label><input type="text" id="editVisa" value="${b.visa||''}" placeholder="Visa no."></div>
+    </div>
+    <div class="btn-row"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveGuestEdit(${b.id})">Save Changes</button></div>
+  </div>`;
+  document.getElementById('modalBody').innerHTML=html;document.getElementById('guestModal').classList.add('show');
+}
+async function saveGuestEdit(id){
+  const b=bookings.find(x=>x.id===id);if(!b)return;
+  const oldCI=b.checkIn,oldCO=b.checkOut,oldRoom=b.roomId,oldBed=b.bedroomIdx;
+  b.guestName=document.getElementById('editName').value.trim()||b.guestName;
+  b.gender=document.getElementById('editGender').value;
+  b.checkIn=document.getElementById('editCheckIn').value||b.checkIn;
+  b.checkOut=document.getElementById('editCheckOut').value||b.checkOut;
+  b.roomId=document.getElementById('editRoom').value;
+  b.bedroomIdx=parseInt(document.getElementById('editBed').value)||0;
+  b.nationality=document.getElementById('editNat').value;
+  b.aadhaar=document.getElementById('editAadhaar').value.trim();
+  b.passport=document.getElementById('editPassport').value.trim();
+  b.visa=document.getElementById('editVisa').value.trim();
+  const rm=rooms.find(r=>r.id===b.roomId);
+  const changes=[];
+  if(oldCI!==b.checkIn)changes.push('checkin:'+oldCI+'->'+b.checkIn);
+  if(oldCO!==b.checkOut)changes.push('checkout:'+oldCO+'->'+b.checkOut);
+  if(oldRoom!==b.roomId)changes.push('room:'+oldRoom+'->'+b.roomId);
+  if(oldBed!==b.bedroomIdx)changes.push('bed:'+oldBed+'->'+b.bedroomIdx);
+  console.log('[WLF7-EDIT] saveGuestEdit id='+id+', changes: '+(changes.length?changes.join(', '):'none'));
+  logEdit('edit','Edited '+b.guestName+(changes.length?' ('+changes.join(', ')+')':' (no changes)'));
+  closeModal();render();
+  try{
+    const result=await saveDataNow();
+    if(result)showSaveToast('Saved: '+b.guestName);
+    else showSaveToast('Save may have failed - please check');
+  }catch(e){console.error('[WLF7-EDIT] save error:',e);showSaveToast('Save error!');}
+}
+function filterEditRoom(){
+  const srch=(document.getElementById('editRoomSearch')?.value||'').toLowerCase().trim();
+  const sel=document.getElementById('editRoom');const cur=sel.value;
+  sel.innerHTML='';
+  for(const r of rooms){if(srch&&!r.name.toLowerCase().includes(srch))continue;
+    sel.innerHTML+=`<option value="${r.id}"${r.id===cur?' selected':''}>${r.name} (${ROOM_TYPES[r.type]?.label||r.type})</option>`;}
+  if(!sel.value&&cur)sel.value=cur;
+}
+
+// Edit room name
+function startEditRoomName(id){
+  const room=rooms.find(r=>r.id===id);if(!room)return;
+  const el=document.getElementById('rn-'+id.replace(/[^a-zA-Z0-9]/g,'_'));if(!el)return;
+  const oldName=room.name;
+  el.innerHTML=`<input type="text" class="edit-room-name" value="${oldName.replace(/"/g,'&quot;')}" onblur="finishEditRoomName('${id}',this.value)" onkeydown="if(event.key==='Enter')this.blur();if(event.key==='Escape'){this.value='${oldName.replace(/'/g,"\\'")}';this.blur();}" autofocus>`;
+  el.querySelector('input').focus();el.querySelector('input').select();
+}
+function finishEditRoomName(id,newName){
+  newName=newName.trim();const room=rooms.find(r=>r.id===id);if(!room)return;
+  if(newName&&newName!==room.name){
+    if(rooms.some(r=>r.id!==id&&r.name.toLowerCase()===newName.toLowerCase())){showSaveToast('⚠️ A room with that name already exists.');renderManageRoomList();return;}
+    const oldN=room.name;room.name=newName;logEdit('rename',`Room renamed: ${oldN} → ${newName}`);
+    render();saveDataNow().then(ok=>{if(ok)showSaveToast('Renamed: '+oldN+' → '+newName);else showSaveToast('⚠️ Save may have failed');});}
+  renderManageRoomList();
+}
+function setMaxOverride(id){
+  const room=rooms.find(r=>r.id===id);if(!room)return;const def=getRoomDef(room);
+  const current=room.maxOverride||def.maxPerBed;
+  showInputModal(`Set max people per bed for ${room.name}`,`Default: ${def.maxPerBed}, Current: ${current}. Enter 0 to reset.`,String(current),val=>{
+  if(val===null)return;const n=parseInt(val);if(isNaN(n)||n<0)return;
+  if(n===0||n===def.maxPerBed){delete room.maxOverride;logEdit('override',`${room.name}: max/bed reset to default (${def.maxPerBed})`);}
+  else{room.maxOverride=n;logEdit('override',`${room.name}: max/bed set to ${n} (default: ${def.maxPerBed})`);
+  }
+  render();saveDataNow().then(ok=>{if(ok)showSaveToast('✅ Max override saved');else showSaveToast('⚠️ Save may have failed');});
+  });
+}
+// Excel
+async function exportExcel(){
+  if(typeof XLSX==='undefined')return;const shown=new Set();const rows=[];
+  for(const b of bookings){if(b.coupleId&&shown.has(b.coupleId))continue;if(b.coupleId)shown.add(b.coupleId);const room=rooms.find(r=>r.id===b.roomId);const partner=b.coupleId?bookings.find(x=>x.coupleId===b.coupleId&&x.id!==b.id):null;
+    rows.push({'Guest Name':b.guestName,'Partner Name':partner?partner.guestName:'','Gender':b.gender,'Type':b.isCouple?'Couple':'Single','Room':room?room.name:'','Room Category':room?ROOM_TYPES[room.type]?.label:'','Bedroom':b.bedroomIdx+1,'Check-in':b.checkIn,'Check-out':b.checkOut,'Nationality':b.nationality||'Indian','Aadhaar':b.aadhaar||'','Passport':b.passport||'','Visa':b.visa||''});}
+  const ws1=XLSX.utils.json_to_sheet(rows.length?rows:[{'Guest Name':''}]);
+  const viewDate=document.getElementById('viewDate').value;const summary=[];
+  for(const room of rooms){const def=getRoomDef(room);const occ=getRoomOccupancy(room.id,viewDate);const guests=getRoomBookings(room.id,viewDate);
+    summary.push({'Room':room.name,'Category':def.label,'Beds':def.beds,'Capacity':getEffectiveMax(room),'Occupied':occ.current,'Available':occ.max-occ.current,'Status':occ.current===0?'Empty':occ.current>=occ.max?'Full':'Partial','Guests':guests.map(g=>g.guestName).join(', ')});}
+  const ws2=XLSX.utils.json_to_sheet(summary);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws1,'Bookings');XLSX.utils.book_append_sheet(wb,ws2,'Room Summary');
+  const wbOut=XLSX.write(wb,{bookType:'xlsx',type:'array'});const blob=new Blob([wbOut],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  if(downloads){try{await downloads.save({filename:`wlf7-room-allocation-${viewDate}.xlsx`,data:blob});return;}catch(e){}}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`wlf7-room-allocation-${viewDate}.xlsx`;a.click();URL.revokeObjectURL(a.href);
+}
+function importExcel(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();
+  reader.onload=function(evt){try{const wb=XLSX.read(evt.target.result,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws);let imported=0;
+    for(const row of rows){const name=(row['Guest Name']||'').toString().trim();if(!name)continue;const gender=(row['Gender']||'male').toString().toLowerCase().trim();const type=(row['Type']||'Single').toString().toLowerCase().trim();const isCouple=type==='couple';const partnerName=(row['Partner Name']||'').toString().trim();
+      let checkIn=(row['Check-in']||'').toString().trim();let checkOut=(row['Check-out']||'').toString().trim();
+      if(checkIn&&!isNaN(checkIn)){const d=new Date((parseFloat(checkIn)-25569)*86400000);checkIn=dateStr(d);}
+      if(checkOut&&!isNaN(checkOut)){const d=new Date((parseFloat(checkOut)-25569)*86400000);checkOut=dateStr(d);}
+      if(!checkIn||!checkOut)continue;
+      const nationality=(row['Nationality']||'Indian').toString().trim();const aadhaar=(row['Aadhaar']||'').toString().trim();const passport=(row['Passport']||'').toString().trim();const visa=(row['Visa']||'').toString().trim();
+      const roomName=(row['Room']||'').toString().trim();const bedroomIdx=parseInt(row['Bedroom']||'1')-1;
+      let room=rooms.find(r=>r.name===roomName);let rId,bIdx;
+      if(room){rId=room.id;bIdx=bedroomIdx>=0?bedroomIdx:0;}
+      else{const r=findBestRoom(gender==='female'?'female':'male',isCouple,checkIn,checkOut,'auto');if(!r)continue;rId=r.room.id;bIdx=r.bedroom;}
+      const gd={nationality,aadhaar,passport,visa,passportAssetId:null,visaAssetId:null};
+      if(isCouple&&partnerName){const cid=`c-${nextBookingId}`;bookings.push({id:nextBookingId++,guestName:name,gender:gender==='female'?'female':'male',isCouple:true,coupleId:cid,roomId:rId,bedroomIdx:bIdx,checkIn,checkOut,...gd});bookings.push({id:nextBookingId++,guestName:partnerName,gender:gender==='female'?'male':'female',isCouple:true,coupleId:cid,roomId:rId,bedroomIdx:bIdx,checkIn,checkOut,...gd});}
+      else{bookings.push({id:nextBookingId++,guestName:name,gender:gender==='female'?'female':'male',isCouple:false,coupleId:null,roomId:rId,bedroomIdx:bIdx,checkIn,checkOut,...gd});}
+      imported++;}
+    render();showMsg(`✓ Imported ${imported} booking${imported!==1?'s':''}.`,'success');
+    saveDataNow().then(ok=>{if(ok)showSaveToast('✅ Imported '+imported+' booking(s)');else showSaveToast('⚠️ Import save may have failed');}).catch(()=>showSaveToast('⚠️ Save error'));
+  }catch(err){showMsg('Import failed: '+err.message,'error');}};reader.readAsArrayBuffer(file);e.target.value='';
+}
+
+// === CSV RESET IMPORT ===
+function csvResetImport(e){
+  const file=e.target.files[0];if(!file)return;
+  showConfirmModal('⚠️ This will DELETE ALL existing bookings and rooms, then import fresh data from this file.<br><br>A backup of current data will be created first.<br><br>Continue?',()=>{
+    createBackup(false);
+    const reader=new FileReader();
+    reader.onload=function(evt){
+      try{
+        let rows;
+        if(file.name.endsWith('.csv')){
+          // Parse CSV manually
+          rows=parseCSV(evt.target.result);
+        }else{
+          // Excel file
+          const wb=XLSX.read(evt.target.result,{type:'array'});
+          const ws=wb.Sheets[wb.SheetNames[0]];
+          rows=XLSX.utils.sheet_to_json(ws);
+        }
+        // Reset all data
+        bookings=[];rooms=[];
+        nextBookingId=1;nextRoomId=1;
+        // Build rooms from data
+        const roomMap=new Map(); // name -> room object
+        let imported=0;
+        for(const row of rows){
+          const name=(row['Guest Name']||row['guest_name']||row['Name']||row['name']||'').toString().trim();
+          if(!name)continue;
+          const gender=(row['Gender']||row['gender']||'male').toString().toLowerCase().trim();
+          const type=(row['Type']||row['type']||'Single').toString().toLowerCase().trim();
+          const isCouple=type==='couple';
+          const partnerName=(row['Partner Name']||row['partner_name']||row['Partner']||'').toString().trim();
+          let checkIn=(row['Check-in']||row['checkin']||row['CheckIn']||row['check_in']||'').toString().trim();
+          let checkOut=(row['Check-out']||row['checkout']||row['CheckOut']||row['check_out']||'').toString().trim();
+          // Handle Excel date serial numbers
+          if(checkIn&&!isNaN(checkIn)){const d=new Date((parseFloat(checkIn)-25569)*86400000);checkIn=dateStr(d);}
+          if(checkOut&&!isNaN(checkOut)){const d=new Date((parseFloat(checkOut)-25569)*86400000);checkOut=dateStr(d);}
+          if(!checkIn||!checkOut)continue;
+          const nationality=(row['Nationality']||row['nationality']||'Indian').toString().trim();
+          const aadhaar=(row['Aadhaar']||row['aadhaar']||'').toString().trim();
+          const passport=(row['Passport']||row['passport']||'').toString().trim();
+          const visa=(row['Visa']||row['visa']||'').toString().trim();
+          const roomName=(row['Room']||row['room']||row['Room Name']||row['room_name']||'').toString().trim();
+          const roomCategory=(row['Room Category']||row['room_category']||row['Category']||row['category']||'standard').toString().trim().toLowerCase();
+          const bedroomIdx=parseInt(row['Bedroom']||row['bedroom']||row['Bed']||row['bed']||'1')-1;
+          // Map category names to type keys
+          let roomType='standard';
+          const catLower=roomCategory.toLowerCase();
+          if(catLower.includes('couple')||catLower==='couple')roomType='couple';
+          else if(catLower.includes('hostel')&&catLower.includes('f'))roomType='hostel-f';
+          else if(catLower.includes('hostel')&&(catLower.includes('m1')||catLower.includes('male 1')))roomType='hostel-m1';
+          else if(catLower.includes('hostel')&&(catLower.includes('m2')||catLower.includes('male 2')))roomType='hostel-m2';
+          else if(catLower.includes('hospital')&&catLower.includes('f'))roomType='hospital-f';
+          else if(catLower.includes('hospital')&&catLower.includes('m'))roomType='hospital-m';
+          else if(catLower.includes('standard'))roomType='standard';
+          else{
+            // Try exact match
+            for(const[k,v]of Object.entries(ROOM_TYPES)){
+              if(v.label.toLowerCase()===catLower||k===catLower){roomType=k;break;}
+            }
+          }
+          // Create room if needed
+          let rId;
+          if(roomName&&roomMap.has(roomName)){
+            rId=roomMap.get(roomName);
+          }else if(roomName){
+            rId='r-'+nextRoomId++;
+            rooms.push({id:rId,name:roomName,type:roomType});
+            roomMap.set(roomName,rId);
+          }else{
+            // Auto-assign room
+            const r=findBestRoom(gender==='female'?'female':'male',isCouple,checkIn,checkOut,'auto');
+            if(!r)continue;
+            rId=r.room.id;
+          }
+          const bIdx=bedroomIdx>=0?bedroomIdx:0;
+          const gd={nationality,aadhaar,passport,visa,passportAssetId:null,visaAssetId:null};
+          if(isCouple&&partnerName){
+            const cid='c-'+nextBookingId;
+            bookings.push({id:nextBookingId++,guestName:name,gender:gender==='female'?'female':'male',isCouple:true,coupleId:cid,roomId:rId,bedroomIdx:bIdx,checkIn,checkOut,...gd});
+            bookings.push({id:nextBookingId++,guestName:partnerName,gender:gender==='female'?'male':'female',isCouple:true,coupleId:cid,roomId:rId,bedroomIdx:bIdx,checkIn,checkOut,...gd});
+          }else{
+            bookings.push({id:nextBookingId++,guestName:name,gender:gender==='female'?'female':'male',isCouple:false,coupleId:null,roomId:rId,bedroomIdx:bIdx,checkIn,checkOut,...gd});
+          }
+          imported++;
+        }
+        logEdit('import',`CSV Reset: imported ${imported} booking(s), ${rooms.length} room(s)`);
+        render();
+        saveDataNow().then(ok=>{
+          if(ok)showSaveToast('✅ Reset & imported: '+imported+' bookings, '+rooms.length+' rooms');
+          else showSaveToast('⚠️ Save may have failed after import');
+        });
+        showMsg('✓ Reset & imported '+imported+' booking(s) into '+rooms.length+' room(s).','success');
+      }catch(err){
+        showMsg('CSV import failed: '+err.message,'error');
+        console.error('[WLF7-CSV] Import error:',err);
+      }
+    };
+    if(file.name.endsWith('.csv'))reader.readAsText(file);
+    else reader.readAsArrayBuffer(file);
+  });
+  e.target.value='';
+}
+function parseCSV(text){
+  const lines=text.split(/\r?\n/);
+  if(lines.length<2)return [];
+  // Parse header line
+  const headers=parseCSVLine(lines[0]);
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const line=lines[i].trim();
+    if(!line)continue;
+    const vals=parseCSVLine(line);
+    const obj={};
+    headers.forEach((h,idx)=>{obj[h.trim()]=vals[idx]||'';});
+    rows.push(obj);
+  }
+  return rows;
+}
+function parseCSVLine(line){
+  const result=[];let current='';let inQuotes=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(inQuotes){
+      if(ch==='"'){if(i+1<line.length&&line[i+1]==='"'){current+='"';i++;}else{inQuotes=false;}}
+      else{current+=ch;}
+    }else{
+      if(ch==='"'){inQuotes=true;}
+      else if(ch===','){result.push(current);current='';}
+      else{current+=ch;}
+    }
+  }
+  result.push(current);
+  return result;
+}
+function downloadCSVTemplate(){
+  const header='Guest Name,Partner Name,Gender,Type,Room,Room Category,Bedroom,Check-in,Check-out,Nationality,Aadhaar,Passport,Visa';
+  const example='John Doe,,male,Single,Room 101,Standard,1,2026-11-21,2026-11-27,Indian,123456789012,,';
+  const example2='Jane Smith,John Smith,female,Couple,Room 201,Couple,1,2026-11-21,2026-11-27,Other,,AB1234567,V9876543';
+  const csv=header+'\n'+example+'\n'+example2+'\n';
+  const blob=new Blob([csv],{type:'text/csv'});
+  const fname='wlf7_import_template.csv';
+  {const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=fname;a.click();URL.revokeObjectURL(url);}
+}
+
+// Edit Log
+let editLog=[];let editLogEnabled=true;let currentUser=null;
+function logEdit(action,detail){
+  if(!editLogEnabled)return;
+  const who=currentUser||'unknown';
+  editLog.unshift({time:new Date().toISOString(),action,detail,user:who});
+  if(editLog.length>500)editLog.length=500;
+  saveEditLog();
+}
+function saveEditLog(){
+  try{localStorage.setItem('roomAllocEditLog',JSON.stringify(editLog));}catch(e){}
+  if(useCloudDb&&db){try{db.collection('state').doc('editLog').set({log:editLog});}catch(e){}}
+}
+async function loadEditLog(){
+  if(useCloudDb&&db){try{const doc=await db.collection('state').doc('editLog').get();if(doc){const d=typeof doc.data==='function'?doc.data():doc.data;if(d&&d.log){editLog=d.log;return;}}}catch(e){}}
+  try{const s=localStorage.getItem('roomAllocEditLog');if(s)editLog=JSON.parse(s);}catch(e){editLog=[];}
+}
+function clearEditLog(){showConfirmModal('Clear all edit log entries?',()=>{editLog=[];saveEditLog();renderEditLog();});}
+function renderEditLog(){
+  const list=document.getElementById('editLogList');const empty=document.getElementById('editLogEmpty');
+  const filter=document.getElementById('logFilter').value;
+  const logSrch=(document.getElementById('logSearch')?.value||'').toLowerCase().trim();
+  let filtered=filter==='all'?editLog:editLog.filter(e=>e.action===filter);
+  if(logSrch)filtered=filtered.filter(e=>e.detail.toLowerCase().includes(logSrch));
+  if(!filtered.length){list.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  let html='';
+  for(const e of filtered){
+    const d=new Date(e.time);const ts=d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+    const who=e.user?` · <span style="color:var(--primary)">${e.user}</span>`:'';
+    html+=`<div class="log-item"><span class="log-time">${ts}${who}</span><span class="log-action ${e.action}">${e.action}</span><span class="log-detail">${e.detail}</span></div>`;
+  }
+  list.innerHTML=html;
+}
+
+// Backups
+const BACKUP_INTERVAL=6*60*60*1000;const MAX_BACKUPS=40;
+let backups=[];let backupTimer=null;
+async function loadBackups(){
+  if(useCloudDb&&db){try{const doc=await db.collection('state').doc('backups').get();if(doc){const d=typeof doc.data==='function'?doc.data():doc.data;if(d&&d.list){backups=d.list;return;}}}catch(e){}}
+  try{const s=localStorage.getItem('roomAllocBackups');if(s)backups=JSON.parse(s);}catch(e){backups=[];}
+}
+function saveBackupList(){
+  try{localStorage.setItem('roomAllocBackups',JSON.stringify(backups));}catch(e){}
+  if(useCloudDb&&db){try{db.collection('state').doc('backups').set({list:backups});}catch(e){}}
+}
+function createBackup(auto){
+  const data={rooms:JSON.parse(JSON.stringify(rooms)),bookings:JSON.parse(JSON.stringify(bookings)),nextBookingId,nextRoomId};
+  const entry={time:new Date().toISOString(),auto:!!auto,roomCount:rooms.length,bookingCount:bookings.length,data};
+  backups.unshift(entry);
+  if(backups.length>MAX_BACKUPS)backups.length=MAX_BACKUPS;
+  saveBackupList();
+  if(document.getElementById('view-backups').classList.contains('active'))renderBackups();
+  return entry;
+}
+function createBackupNow(){createBackup(false);showMsg('✓ Backup created.','success');}
+function restoreBackup(idx){
+  const b=backups[idx];if(!b||!b.data)return;
+  const d=new Date(b.time);
+  showConfirmModal(`Restore backup from ${d.toLocaleString('en-IN')}?<br><br>This will replace current data with:<br>• ${b.roomCount} rooms<br>• ${b.bookingCount} bookings<br><br>Current data will be backed up first.`,()=>{
+  createBackup(false);
+  rooms=b.data.rooms||defaultRooms();bookings=b.data.bookings||defaultBookings();
+  nextBookingId=b.data.nextBookingId||DEFAULT_NEXT_BOOKING_ID;nextRoomId=b.data.nextRoomId||DEFAULT_NEXT_ROOM_ID;
+  logEdit('edit','Restored from backup: '+d.toLocaleString('en-IN'));
+  render();renderBackups();
+  saveDataNow().then(ok=>{if(ok)showSaveToast('✅ Data restored from backup');else showSaveToast('⚠️ Restore save may have failed');});
+  });
+}
+function deleteBackup(idx){
+  showConfirmModal('Delete this backup?',()=>{backups.splice(idx,1);saveBackupList();renderBackups();});
+}
+function scheduleAutoBackup(){
+  if(backupTimer)clearInterval(backupTimer);
+  backupTimer=setInterval(()=>{createBackup(true);},BACKUP_INTERVAL);
+  updateBackupStatus();
+}
+function updateBackupStatus(){
+  const el=document.getElementById('backupStatus');if(!el)return;
+  const last=backups.find(b=>b.auto);
+  if(last){const next=new Date(new Date(last.time).getTime()+BACKUP_INTERVAL);
+    el.textContent=`Last auto-backup: ${new Date(last.time).toLocaleString('en-IN')} · Next: ~${next.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})}`;}
+  else{el.textContent='Next auto-backup: within 6 hours of page load';}
+}
+function renderBackups(){
+  const list=document.getElementById('backupList');const empty=document.getElementById('backupEmpty');
+  updateBackupStatus();
+  if(!backups.length){list.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  let html='';
+  backups.forEach((b,i)=>{
+    const d=new Date(b.time);const ts=d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
+    const age=Math.round((Date.now()-d.getTime())/(1000*60*60));const ageStr=age<1?'just now':age<24?age+'h ago':Math.round(age/24)+'d ago';
+    html+=`<div class="backup-item"><div class="backup-meta"><div class="backup-date">${ts} ${b.auto?'<span style="color:var(--text-muted);font-size:10px">(auto)</span>':'<span style="color:var(--primary);font-size:10px">(manual)</span>'}</div><div class="backup-info">${b.roomCount} rooms · ${b.bookingCount} bookings · ${ageStr}</div></div><div style="display:flex;gap:4px"><button class="btn btn-primary btn-sm" onclick="restoreBackup(${i})">Restore</button><button class="btn btn-danger btn-sm" onclick="deleteBackup(${i})">Delete</button></div></div>`;
+  });
+  list.innerHTML=html;
+}
+
+// Form C — Foreign Guest Reporting (BOI India)
+let formcReports=[];
+function getForeignGuests(){return bookings.filter(b=>b.nationality&&b.nationality!=='Indian');}
+
+// Load/save daily report history from cloud
+async function loadFormCHistory(){
+  if(!useCloudDb||!db)return;
+  try{const doc=await db.collection('state').doc('formcReports').get();
+    if(doc){const d=typeof doc.data==='function'?doc.data():doc.data;if(d&&d.reports)formcReports=d.reports;}
+  }catch(e){}
+  renderFormCHistory();
+}
+function saveFormCHistory(){
+  if(useCloudDb&&db){try{db.collection('state').doc('formcReports').set({reports:formcReports});}catch(e){}}
+}
+function renderFormCHistory(){
+  const el=document.getElementById('formcHistoryList');if(!el)return;
+  const countEl=document.getElementById('formcHistoryCount');
+  if(countEl)countEl.textContent=`${formcReports.length} report${formcReports.length!==1?'s':''}`;
+  if(!formcReports.length){el.innerHTML='<div style="text-align:center;color:var(--text-light);padding:20px;font-size:12px">No daily reports generated yet.</div>';return;}
+  let html='';
+  // Show newest first
+  const sorted=[...formcReports].sort((a,b)=>b.date.localeCompare(a.date));
+  sorted.forEach(r=>{
+    const arrN=r.arrivals?r.arrivals.length:0;
+    const depN=r.departures?r.departures.length:0;
+    const stayN=r.staying?r.staying.length:0;
+    html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <div>
+        <strong>${r.date}</strong>
+        <span style="color:var(--text-muted);margin-left:8px">
+          ${arrN?`<span style="color:var(--success)">↓${arrN} arrived</span>`:''}
+          ${depN?`<span style="color:var(--danger);margin-left:4px">↑${depN} departed</span>`:''}
+          <span style="color:var(--text-light);margin-left:4px">${stayN} staying</span>
+        </span>
+        <div style="font-size:10px;color:var(--text-light)">Generated: ${r.generatedAt||'—'}</div>
+      </div>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-outline btn-sm" style="font-size:10px" onclick="downloadDailyReport('${r.date}')">📋 .txt</button>
+        <button class="btn btn-outline btn-sm" style="font-size:10px" onclick="downloadDailyReportExcel('${r.date}')">⬇ .xlsx</button>
+      </div>
+    </div>`;
+  });
+  el.innerHTML=html;
+}
+
+// Generate daily incremental report for a specific date
+function generateDailyFormC(forDate){
+  const date=forDate||document.getElementById('formcDate')?.value||document.getElementById('viewDate').value;
+  const foreign=getForeignGuests();
+  const arrivals=foreign.filter(b=>b.checkIn===date);
+  const departures=foreign.filter(b=>b.checkOut===date);
+  const staying=foreign.filter(b=>b.checkIn<=date&&b.checkOut>date);
+
+  // Check if already generated for this date
+  const existing=formcReports.find(r=>r.date===date);
+  if(existing&&!forDate){
+    showConfirmModal(`A daily report for ${date} already exists. Regenerate and replace it?`,()=>{formcReports=formcReports.filter(r=>r.date!==date);_generateFormCInner(date,forDate);});
+    return;
+  }
+
+  const report={
+    date,
+    generatedAt:new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}),
+    arrivals:arrivals.map(b=>({id:b.id,name:b.guestName,nationality:b.nationality,gender:b.gender,room:rooms.find(r=>r.id===b.roomId)?.name||'?',checkIn:b.checkIn,checkOut:b.checkOut,passport:b.passport||'',visa:b.visa||'',complete:!!(b.passport&&b.visa)})),
+    departures:departures.map(b=>({id:b.id,name:b.guestName,nationality:b.nationality,gender:b.gender,room:rooms.find(r=>r.id===b.roomId)?.name||'?',checkIn:b.checkIn,checkOut:b.checkOut,passport:b.passport||'',visa:b.visa||''})),
+    staying:staying.map(b=>({id:b.id,name:b.guestName,nationality:b.nationality,room:rooms.find(r=>r.id===b.roomId)?.name||'?',passport:b.passport||'',visa:b.visa||''}))
+  };
+
+  formcReports.push(report);
+  saveFormCHistory();
+  renderFormCHistory();
+
+  // Auto-download both formats
+  downloadDailyReport(date);
+  setTimeout(()=>downloadDailyReportExcel(date),300);
+
+  if(!forDate) showSaveToast(`✓ Form C for ${date}: ${arrivals.length} arr, ${departures.length} dep, ${staying.length} staying`);
+  return report;
+}
+function _generateFormCInner(date,forDate){generateDailyFormC(forDate||date);}
+
+function downloadDailyReport(date){
+  const r=formcReports.find(x=>x.date===date);if(!r)return;
+  let txt='FORM C — DAILY REPORT\n';
+  txt+='Bureau of Immigration (BOI), India\n';
+  txt+=`Report Date: ${r.date}\n`;
+  txt+=`Generated: ${r.generatedAt}\n`;
+  txt+='='+'='.repeat(60)+'\n\n';
+
+  if(r.arrivals.length){
+    txt+=`--- NEW ARRIVALS (${r.arrivals.length}) --- [Form C due within 24 hrs]\n\n`;
+    r.arrivals.forEach((g,i)=>{
+      txt+=`  ${i+1}. ${g.name}\n`;
+      txt+=`     Nationality: ${g.nationality||'—'} | Gender: ${g.gender==='male'?'Male':'Female'}\n`;
+      txt+=`     Room: ${g.room} | Check-in: ${g.checkIn} | Check-out: ${g.checkOut}\n`;
+      txt+=`     Passport: ${g.passport||'NOT PROVIDED'} | Visa: ${g.visa||'NOT PROVIDED'}\n`;
+      txt+=`     Status: ${g.complete?'✓ READY TO SUBMIT':'⚠ INCOMPLETE — MISSING DOCUMENTS'}\n\n`;
+    });
+  }else txt+='--- NEW ARRIVALS: None ---\n\n';
+
+  if(r.departures.length){
+    txt+=`--- DEPARTURES (${r.departures.length}) ---\n\n`;
+    r.departures.forEach((g,i)=>{
+      txt+=`  ${i+1}. ${g.name} | ${g.nationality||'—'} | Room: ${g.room}\n`;
+      txt+=`     Passport: ${g.passport||'—'} | Stayed: ${g.checkIn} → ${g.checkOut}\n\n`;
+    });
+  }else txt+='--- DEPARTURES: None ---\n\n';
+
+  txt+=`--- CURRENTLY STAYING: ${r.staying.length} foreign guest(s) ---\n\n`;
+  if(r.staying.length){
+    r.staying.forEach((g,i)=>{
+      txt+=`  ${i+1}. ${g.name} | ${g.nationality||'—'} | Room: ${g.room} | Passport: ${g.passport||'—'}\n`;
+    });
+  }
+  txt+='\n--- End of Daily Report ---\n';
+
+  const blob=new Blob([txt],{type:'text/plain'});
+  const fname=`FormC_Daily_${r.date}.txt`;
+  {const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=fname;a.click();URL.revokeObjectURL(url);}
+}
+
+function downloadDailyReportExcel(date){
+  if(typeof XLSX==='undefined')return;
+  const r=formcReports.find(x=>x.date===date);if(!r)return;
+  const wb=XLSX.utils.book_new();
+
+  // Arrivals sheet
+  if(r.arrivals.length){
+    const rows=r.arrivals.map((g,i)=>({'#':i+1,'Guest Name':g.name,'Nationality':g.nationality||'','Gender':g.gender==='male'?'Male':'Female','Room':g.room,'Check-in':g.checkIn,'Check-out':g.checkOut,'Passport':g.passport||'','Visa':g.visa||'','Status':g.complete?'Ready':'Incomplete'}));
+    const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=[{wch:4},{wch:35},{wch:15},{wch:8},{wch:12},{wch:12},{wch:12},{wch:18},{wch:18},{wch:12}];
+    XLSX.utils.book_append_sheet(wb,ws,'Arrivals');
+  }
+  // Departures sheet
+  if(r.departures.length){
+    const rows=r.departures.map((g,i)=>({'#':i+1,'Guest Name':g.name,'Nationality':g.nationality||'','Room':g.room,'Check-in':g.checkIn,'Check-out':g.checkOut,'Passport':g.passport||''}));
+    const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=[{wch:4},{wch:35},{wch:15},{wch:12},{wch:12},{wch:12},{wch:18}];
+    XLSX.utils.book_append_sheet(wb,ws,'Departures');
+  }
+  // Staying sheet
+  if(r.staying.length){
+    const rows=r.staying.map((g,i)=>({'#':i+1,'Guest Name':g.name,'Nationality':g.nationality||'','Room':g.room,'Passport':g.passport||'','Visa':g.visa||''}));
+    const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=[{wch:4},{wch:35},{wch:15},{wch:12},{wch:18},{wch:18}];
+    XLSX.utils.book_append_sheet(wb,ws,'Currently Staying');
+  }
+
+  const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const fname=`FormC_Daily_${r.date}.xlsx`;
+  {const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=fname;a.click();URL.revokeObjectURL(url);}
+}
+function renderFormC(){
+  const date=document.getElementById('formcDate')?.value||document.getElementById('viewDate').value;
+  const filter=document.getElementById('formcFilter').value;
+  const srch=(document.getElementById('formcSearch')?.value||'').toLowerCase().trim();
+  let guests=getForeignGuests();
+  // Filter by date/status
+  if(filter==='current')guests=guests.filter(b=>b.checkIn<=date&&b.checkOut>date);
+  else if(filter==='arriving')guests=guests.filter(b=>b.checkIn===date);
+  else if(filter==='departing')guests=guests.filter(b=>b.checkOut===date);
+  else if(filter==='missing')guests=guests.filter(b=>!b.passport||!b.visa);
+  // Search
+  if(srch)guests=guests.filter(b=>b.guestName.toLowerCase().includes(srch)||(b.passport||'').toLowerCase().includes(srch)||(b.nationality||'').toLowerCase().includes(srch));
+  const tbody=document.getElementById('formcBody');
+  const empty=document.getElementById('formcEmpty');
+  document.getElementById('formcCount').textContent=`${guests.length} foreign guest${guests.length!==1?'s':''}`;
+  if(!guests.length){tbody.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  let html='';
+  guests.forEach((b,i)=>{
+    const room=rooms.find(r=>r.id===b.roomId);
+    const hasPassport=!!b.passport;const hasVisa=!!b.visa;
+    const hasScan=!!b.passportAssetId;const hasVisaScan=!!b.visaAssetId;
+    const complete=hasPassport&&hasVisa;
+    const statusCls=complete?'color:var(--success)':'color:var(--danger)';
+    const statusTxt=complete?'✓ Ready':'⚠ Incomplete';
+    html+=`<tr>
+      <td style="padding:6px 8px;font-size:11px">${i+1}</td>
+      <td style="padding:6px 8px;font-size:12px;font-weight:600;color:var(--accent);cursor:pointer" onclick="showGuestDetail(${b.id})">${b.guestName}</td>
+      <td style="padding:6px 8px;font-size:11px">${b.nationality||'—'}</td>
+      <td style="padding:6px 8px;font-size:11px">${b.gender==='male'?'♂ M':'♀ F'}</td>
+      <td style="padding:6px 8px;font-size:11px">${room?room.name:'—'}</td>
+      <td style="padding:6px 8px;font-size:11px">${b.checkIn}</td>
+      <td style="padding:6px 8px;font-size:11px">${b.checkOut}</td>
+      <td style="padding:6px 8px;font-size:11px;font-family:monospace">${b.passport||'<span style="color:var(--danger)">MISSING</span>'}</td>
+      <td style="padding:6px 8px;font-size:11px;font-family:monospace">${b.visa||'<span style="color:var(--danger)">MISSING</span>'}</td>
+      <td style="padding:6px 8px;font-size:11px">${hasScan?'📄':'—'}${hasVisaScan?' 📋':''}</td>
+      <td style="padding:6px 8px;font-size:11px;font-weight:600;${statusCls}">${statusTxt}</td>
+    </tr>`;
+  });
+  tbody.innerHTML=html;
+}
+function generateFormCReport(){
+  const date=document.getElementById('formcDate')?.value||document.getElementById('viewDate').value;
+  const guests=getForeignGuests().filter(b=>b.checkIn<=date&&b.checkOut>date);
+  if(!guests.length){showSaveToast('No foreign guests currently staying on '+date);return;}
+  let report='FORM C — FOREIGN GUEST REPORT\n';
+  report+='Bureau of Immigration (BOI), India\n';
+  report+='Report Date: '+date+'\n';
+  report+='Generated: '+new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})+'\n';
+  report+='='+'='.repeat(70)+'\n\n';
+  report+=`Total Foreign Guests Currently Staying: ${guests.length}\n\n`;
+  guests.forEach((b,i)=>{
+    const room=rooms.find(r=>r.id===b.roomId);
+    report+=`--- Guest ${i+1} ---\n`;
+    report+=`Full Name (as in passport): ${b.guestName}\n`;
+    report+=`Nationality: ${b.nationality||'—'}\n`;
+    report+=`Gender: ${b.gender==='male'?'Male':'Female'}\n`;
+    report+=`Room: ${room?room.name:'—'}\n`;
+    report+=`Date of Arrival (Check-in): ${b.checkIn}\n`;
+    report+=`Proposed Departure (Check-out): ${b.checkOut}\n`;
+    report+=`Passport No: ${b.passport||'NOT PROVIDED'}\n`;
+    report+=`Visa No: ${b.visa||'NOT PROVIDED'}\n`;
+    report+=`Passport Scan: ${b.passportAssetId?'Uploaded':'NOT UPLOADED'}\n`;
+    report+=`Visa Scan: ${b.visaAssetId?'Uploaded':'NOT UPLOADED'}\n`;
+    report+=`Form C Status: ${b.passport&&b.visa?'READY TO SUBMIT':'INCOMPLETE — MISSING DOCUMENTS'}\n\n`;
+  });
+  report+='\n--- Missing Documents Summary ---\n';
+  const missing=guests.filter(b=>!b.passport||!b.visa);
+  if(missing.length){missing.forEach(b=>{
+    const lacks=[];if(!b.passport)lacks.push('Passport');if(!b.visa)lacks.push('Visa');
+    report+=`  ⚠ ${b.guestName}: Missing ${lacks.join(', ')}\n`;
+  });}else report+='  All guests have complete documentation.\n';
+  report+='\n--- End of Report ---\n';
+  // Download as text
+  {
+    const blob=new Blob([report],{type:'text/plain'});
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`FormC_Report_${date}.txt`;a.click();URL.revokeObjectURL(url);
+  }
+}
+function exportFormCExcel(){
+  if(typeof XLSX==='undefined'){showSaveToast('⚠️ SheetJS not loaded');return;}
+  const date=document.getElementById('formcDate')?.value||document.getElementById('viewDate').value;
+  const filter=document.getElementById('formcFilter').value;
+  let guests=getForeignGuests();
+  if(filter==='current')guests=guests.filter(b=>b.checkIn<=date&&b.checkOut>date);
+  else if(filter==='arriving')guests=guests.filter(b=>b.checkIn===date);
+  else if(filter==='departing')guests=guests.filter(b=>b.checkOut===date);
+  else if(filter==='missing')guests=guests.filter(b=>!b.passport||!b.visa);
+  if(!guests.length){showSaveToast('No foreign guests to export.');return;}
+  const rows=guests.map((b,i)=>{
+    const room=rooms.find(r=>r.id===b.roomId);
+    return{'#':i+1,'Guest Name (as in passport)':b.guestName,'Nationality':b.nationality||'','Gender':b.gender==='male'?'Male':'Female','Room':room?room.name:'','Check-in Date':b.checkIn,'Check-out Date':b.checkOut,'Passport Number':b.passport||'','Visa Number':b.visa||'','Passport Scan':b.passportAssetId?'Yes':'No','Visa Scan':b.visaAssetId?'Yes':'No','Form C Status':(b.passport&&b.visa)?'Ready':'Incomplete'};
+  });
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:4},{wch:35},{wch:15},{wch:8},{wch:12},{wch:12},{wch:12},{wch:18},{wch:18},{wch:10},{wch:10},{wch:12}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Form C Report');
+  const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  {
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`FormC_ForeignGuests_${date}.xlsx`;a.click();URL.revokeObjectURL(url);
+  }
+}
+
+// Click-to-move + Drag-and-drop guest reassignment
+let dragBookingId=null;
+let clickMoveBookingId=null;
+
+// === CLICK-TO-MOVE (primary, works reliably in iframes) ===
+function startClickMove(bid,e){
+  if(e)e.stopPropagation();
+  if(clickMoveBookingId===bid){cancelClickMove();return;}
+  clickMoveBookingId=bid;
+  const b=bookings.find(x=>x.id===bid);
+  if(!b)return;
+  // Show banner
+  const banner=document.getElementById('moveBanner');
+  document.getElementById('moveBannerText').textContent=`Moving ${b.guestName} — click a bed to place`;
+  banner.classList.add('show');
+  // Highlight selected guest
+  document.querySelectorAll('.guest-tag.selected-for-move').forEach(el=>el.classList.remove('selected-for-move'));
+  const tag=document.querySelector(`.guest-tag[data-bid="${bid}"]`);
+  if(tag)tag.classList.add('selected-for-move');
+  // Highlight all bedrooms as targets
+  document.querySelectorAll('.bedroom[data-room]').forEach(el=>{el.classList.add('click-target');el.closest('.room-card').classList.add('drag-highlight');});
+}
+function cancelClickMove(){
+  clickMoveBookingId=null;
+  document.getElementById('moveBanner').classList.remove('show');
+  document.querySelectorAll('.selected-for-move,.click-target,.drag-highlight').forEach(el=>el.classList.remove('selected-for-move','click-target','drag-highlight'));
+}
+function onBedClick(e){
+  if(!clickMoveBookingId)return;
+  const bed=e.currentTarget;
+  const targetRoom=bed.dataset.room;
+  const targetBed=parseInt(bed.dataset.bed);
+  const bid=clickMoveBookingId;
+  cancelClickMove();
+  moveGuestToRoom(bid,targetRoom,targetBed);
+}
+// Escape key cancels
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&clickMoveBookingId)cancelClickMove();});
+
+// Guest click handler: tap to select for move, double-tap or long-press for detail
+let lastGuestClickTime=0;let lastGuestClickId=null;
+function onGuestClick(bid,e){
+  const now=Date.now();
+  if(lastGuestClickId===bid&&now-lastGuestClickTime<400){lastGuestClickId=null;lastGuestClickTime=0;cancelClickMove();showGuestDetail(bid);return;}
+  lastGuestClickId=bid;lastGuestClickTime=now;
+  if(clickMoveBookingId){if(clickMoveBookingId===bid){cancelClickMove();}else{startClickMove(bid,e);}return;}
+  startClickMove(bid,e);
+}
+
+// === DRAG-AND-DROP (secondary, may not work in all iframe contexts) ===
+function onGuestDragStart(e){
+  dragBookingId=parseInt(e.target.dataset.bid);
+  e.target.classList.add('dragging');
+  e.dataTransfer.effectAllowed='move';
+  try{e.dataTransfer.setData('text/plain',String(dragBookingId));}catch(ex){}
+  document.querySelectorAll('.bedroom[data-room]').forEach(el=>el.closest('.room-card').classList.add('drag-highlight'));
+}
+function onGuestDragEnd(e){
+  dragBookingId=null;
+  e.target.classList.remove('dragging');
+  document.querySelectorAll('.drag-over,.drag-invalid,.drag-warn,.drag-highlight').forEach(el=>el.classList.remove('drag-over','drag-invalid','drag-warn','drag-highlight'));
+}
+function onBedDragOver(e){
+  e.preventDefault();
+  const bed=e.currentTarget;
+  if(!dragBookingId)return;
+  const check=checkDropGuest(dragBookingId,bed.dataset.room,parseInt(bed.dataset.bed));
+  bed.classList.remove('drag-over','drag-invalid','drag-warn');
+  if(check.ok)bed.classList.add('drag-over');
+  else if(check.overridable)bed.classList.add('drag-warn');
+  else bed.classList.add('drag-invalid');
+  e.dataTransfer.dropEffect=(check.ok||check.overridable)?'move':'none';
+}
+function onBedDragLeave(e){
+  e.currentTarget.classList.remove('drag-over','drag-invalid','drag-warn');
+}
+function onBedDrop(e){
+  e.preventDefault();
+  const bed=e.currentTarget;
+  bed.classList.remove('drag-over','drag-invalid','drag-warn');
+  const bid=dragBookingId;
+  if(!bid)return;
+  dragBookingId=null;
+  const targetRoom=bed.dataset.room;
+  const targetBed=parseInt(bed.dataset.bed);
+  moveGuestToRoom(bid,targetRoom,targetBed);
+}
+function checkDropGuest(bid,targetRoomId,targetBedIdx){
+  /* Returns {ok:true} or {ok:false, reason:'...', overridable:bool} */
+  const b=bookings.find(x=>x.id===bid);if(!b)return{ok:false,reason:'Booking not found',overridable:false};
+  if(b.roomId===targetRoomId&&b.bedroomIdx===targetBedIdx)return{ok:false,reason:'same',overridable:false};
+  const room=rooms.find(r=>r.id===targetRoomId);if(!room)return{ok:false,reason:'Room not found',overridable:false};
+  const def=getRoomDef(room);
+  const viewDate=document.getElementById('viewDate').value;
+  const checkDate=b.checkIn>viewDate?b.checkIn:viewDate;
+  const warnings=[];
+  // gender check
+  if(def.gender&&!b.isCouple&&b.gender!==def.gender){
+    warnings.push(`Gender mismatch: ${b.guestName} (${b.gender}) → ${room.name} (${def.gender}-only)`);}
+  // capacity check
+  const effMpb=getEffectiveMaxPerBed(room);
+  const existing=getBedroomBookings(targetRoomId,targetBedIdx,checkDate).filter(x=>x.id!==bid);
+  if(existing.length>=effMpb){
+    warnings.push(`Over capacity: Bed ${targetBedIdx+1} has ${existing.length}/${effMpb} guests`);}
+  if(warnings.length)return{ok:false,reason:warnings.join('\n'),overridable:true};
+  return{ok:true};
+}
+function canDropGuest(bid,targetRoomId,targetBedIdx){return checkDropGuest(bid,targetRoomId,targetBedIdx).ok;}
+function executeMove(bid,targetRoomId,targetBedIdx,isOverride){
+  const b=bookings.find(x=>x.id===bid);if(!b){console.error('[WLF7-MOVE] Booking not found: '+bid);return;}
+  const oldRoom=rooms.find(r=>r.id===b.roomId);const newRoom=rooms.find(r=>r.id===targetRoomId);
+  const oldName=oldRoom?oldRoom.name:'?';const newName=newRoom?newRoom.name:'?';
+  const oldRoomId=b.roomId;const oldBed=b.bedroomIdx;
+  console.log('[WLF7-MOVE] BEFORE: bid='+bid+' roomId='+oldRoomId+' bed='+oldBed+' -> target roomId='+targetRoomId+' bed='+targetBedIdx);
+  // Apply move in-memory
+  b.roomId=targetRoomId;b.bedroomIdx=targetBedIdx;
+  const overrideNote=isOverride?'[OVERRIDE] ':'';
+  logEdit('move',`${overrideNote}${b.guestName}: ${oldName} -> ${newName} Bed ${targetBedIdx+1}`);
+  if(b.coupleId){
+    const partner=bookings.find(x=>x.coupleId===b.coupleId&&x.id!==b.id);
+    if(partner){partner.roomId=targetRoomId;partner.bedroomIdx=targetBedIdx;logEdit('move',`${overrideNote}${partner.guestName} (partner): ${oldName} -> ${newName} Bed ${targetBedIdx+1}`);}
+  }
+  // RENDER IMMEDIATELY so UI updates right away
+  render();
+  // Then save to cloud in background
+  saveDataNow().then(ok=>{
+    showSaveToast(ok?`✅ ${b.guestName} moved to ${newName}`:'⚠️ Move save failed — try again');
+  }).catch(e=>{
+    console.error('[WLF7-MOVE] Save error:',e);
+    showSaveToast('⚠️ Move save error');
+  });
+}
+function moveGuestToRoom(bid,targetRoomId,targetBedIdx){
+  const b=bookings.find(x=>x.id===bid);if(!b)return;
+  const check=checkDropGuest(bid,targetRoomId,targetBedIdx);
+  if(!check.ok){
+    if(!check.overridable)return;
+    const room=rooms.find(r=>r.id===targetRoomId);
+    showOverrideModal(check.reason,b.guestName,room?room.name:'?',()=>executeMove(bid,targetRoomId,targetBedIdx,true));
+    return;
+  }
+  executeMove(bid,targetRoomId,targetBedIdx,false);
+}
+function showInputModal(title,hint,defaultVal,onSubmit){
+  let modal=document.getElementById('inputModal');
+  if(!modal){
+    modal=document.createElement('div');modal.id='inputModal';
+    modal.innerHTML=`<div class="override-modal-backdrop"></div><div class="override-modal-box"><div class="override-modal-title" id="inputModalTitle"></div><div class="override-modal-body"><p id="inputModalHint" style="margin-bottom:8px"></p><input type="text" id="inputModalVal" class="guest-input" style="width:100%"></div><div class="override-modal-actions"><button class="btn" id="inputCancel">Cancel</button><button class="btn btn-primary" id="inputOk">OK</button></div></div>`;
+    document.body.appendChild(modal);
+  }
+  document.getElementById('inputModalTitle').textContent=title;
+  document.getElementById('inputModalHint').textContent=hint||'';
+  const inp=document.getElementById('inputModalVal');inp.value=defaultVal||'';
+  modal.style.display='flex';
+  setTimeout(()=>inp.focus(),50);
+  function cleanup(){modal.style.display='none';}
+  document.getElementById('inputCancel').onclick=()=>{cleanup();onSubmit(null);};
+  document.querySelector('#inputModal .override-modal-backdrop').onclick=()=>{cleanup();onSubmit(null);};
+  document.getElementById('inputOk').onclick=()=>{cleanup();onSubmit(inp.value);};
+  inp.onkeydown=e=>{if(e.key==='Enter'){cleanup();onSubmit(inp.value);}};
+}
+function showOverrideModal(reason,guestName,roomName,onConfirm){
+  let modal=document.getElementById('overrideModal');
+  if(!modal){
+    modal=document.createElement('div');modal.id='overrideModal';
+    modal.innerHTML=`<div class="override-modal-backdrop"></div><div class="override-modal-box"><div class="override-modal-title">⚠️ Override Warning</div><div class="override-modal-body" id="overrideModalBody"></div><div class="override-modal-actions"><button class="btn" id="overrideCancel">Cancel</button><button class="btn btn-danger" id="overrideConfirm">Move Anyway</button></div></div>`;
+    document.body.appendChild(modal);
+  }
+  document.getElementById('overrideModalBody').innerHTML=`<p>${reason.replace(/\n/g,'<br>')}</p><p style="margin-top:8px">Move <b>${guestName}</b> to <b>${roomName}</b> anyway?</p>`;
+  modal.style.display='flex';
+  const cancel=document.getElementById('overrideCancel');
+  const conf=document.getElementById('overrideConfirm');
+  function cleanup(){modal.style.display='none';cancel.onclick=null;conf.onclick=null;}
+  cancel.onclick=cleanup;
+  document.querySelector('.override-modal-backdrop').onclick=cleanup;
+  conf.onclick=()=>{cleanup();onConfirm();};
+}
+
+// Display settings
+let displayPrefs={font:null,fontSize:null};
+function openSettings(){document.getElementById('settingsOverlay').classList.add('show');}
+function closeSettings(){document.getElementById('settingsOverlay').classList.remove('show');}
+function applyFont(val){
+  document.documentElement.style.setProperty('--font',val);
+  displayPrefs.font=val;saveDisplayPrefs();
+}
+function applyFontSize(val){
+  val=String(val);
+  document.documentElement.style.setProperty('--fs',val+'px');
+  document.getElementById('fsVal').textContent=val+'px';
+  document.getElementById('settingsSize').value=val;
+  displayPrefs.fontSize=val;saveDisplayPrefs();
+}
+function saveDisplayPrefs(){
+  try{localStorage.setItem('roomAllocDisplayPrefs',JSON.stringify(displayPrefs));}catch(e){}
+  // Also persist to cloud DB
+  if(useCloudDb&&db){try{db.collection('state').doc('displayPrefs').set(displayPrefs);}catch(e){}}
+}
+function loadDisplaySettings(){
+  // Try localStorage first (fast)
+  try{
+    const raw=localStorage.getItem('roomAllocDisplayPrefs');
+    if(raw){displayPrefs=JSON.parse(raw);}
+  }catch(e){}
+  applyDisplayPrefs();
+}
+function loadDisplayFromCloud(){
+  // Called after cloud DB init; overrides localStorage if cloud has prefs
+  if(!useCloudDb||!db)return;
+  try{db.collection('state').doc('displayPrefs').onSnapshot(doc=>{
+    if(!doc)return;const d=typeof doc.data==='function'?doc.data():doc.data;
+    if(d&&(d.font||d.fontSize)){
+      displayPrefs=d;applyDisplayPrefs();
+      try{localStorage.setItem('roomAllocDisplayPrefs',JSON.stringify(displayPrefs));}catch(e){}
+    }
+  });}catch(e){}
+}
+function applyDisplayPrefs(){
+  if(displayPrefs.font){document.documentElement.style.setProperty('--font',displayPrefs.font);const sel=document.getElementById('settingsFont');if(sel)for(let o of sel.options){if(o.value===displayPrefs.font){o.selected=true;break;}}}
+  if(displayPrefs.fontSize){document.documentElement.style.setProperty('--fs',displayPrefs.fontSize+'px');const sizeEl=document.getElementById('settingsSize');if(sizeEl)sizeEl.value=displayPrefs.fontSize;const valEl=document.getElementById('fsVal');if(valEl)valEl.textContent=displayPrefs.fontSize+'px';}
+}
+function toggleFullscreen(){
+  document.body.classList.toggle('fullscreen-mode');
+  const isFs=document.body.classList.contains('fullscreen-mode');
+  document.getElementById('fsBtn').textContent=isFs?'⛶ Exit FS':'⛶ Fullscreen';
+}
+
+// Init
+function init(){
+  loadDisplaySettings();
+  const today=new Date(),todayS=dateStr(today);
+  document.getElementById('viewDate').value=todayS;document.getElementById('checkIn').value=todayS;document.getElementById('formcDate').value=todayS;
+  const tmrw=new Date();tmrw.setDate(tmrw.getDate()+1);document.getElementById('checkOut').value=dateStr(tmrw);
+  calYear=today.getFullYear();calMonth=today.getMonth();calDay=today.getDate();
+  document.getElementById('viewDate').addEventListener('change',render);
+  document.getElementById('checkIn').addEventListener('change',renderRoomDropdown);
+  document.getElementById('checkOut').addEventListener('change',renderRoomDropdown);
+  document.getElementById('formcDate').addEventListener('change',renderFormC);
+  toggleIdFields();
+  // Initialize with Firebase (standalone mode)
+  if(typeof firebase!=='undefined'&&firebase.initializeApp){
+    initPersistence();
+  }else{
+    document.getElementById('syncBadge').textContent='💾 Local only';
+    loadLocal();loadEditLog();loadBackups();scheduleAutoBackup();showApp();render();
+  }
+}
+init();
+</script>
+</body>
+</html>
