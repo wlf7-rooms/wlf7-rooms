@@ -779,6 +779,13 @@ async function initPersistence(){
   };
   // ═══════════════════════════════════════════════════════════════════
 
+  // Skip Firebase if config not filled in
+  if(!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith('YOUR')){
+    console.log('[WLF7] Firebase config not set, using localStorage');
+    badge.textContent='💾 Local storage';
+    loadLocal();loadEditLog();loadBackups();scheduleAutoBackup();showApp();render();
+    return;
+  }
   try{
     if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     db=firebase.firestore();
